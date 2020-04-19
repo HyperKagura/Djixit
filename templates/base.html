@@ -3,50 +3,46 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <!-- Latest compiled and minified CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
-        crossorigin="anonymous">
-
-    <!-- Optional theme -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp"
-        crossorigin="anonymous">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
 
     <!-- LOCAL CSS -->
-    <link rel="stylesheet" href="{% static "css/game.css " %}"> {% block additional_head %}{% endblock %}
+    <link rel="stylesheet" href="{% static "css/game.css" %}"> {% block additional_head %}{% endblock %}
+    <title>Djixit</title>
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
 </head>
 
-<body style="padding-top:65px;">
-    <nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark" role="navigation">
         <div class="container">
-            <div class="navbar-header">
-                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-            </button>
-                <a class="navbar-brand" href="/">Django Channels Games</a>
+            <div class="navbar-header navbar-nav">
+                <a class="nav-link" href="/">Django Channels Games</a>
             </div>
-            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-                <ul class="nav navbar-nav">
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav mr-auto">
                     {% if request.user.is_authenticated %}
-                        <li><a href="/dixit/">Dixit</a></li>
-                        <li><a href="/logout/?next=/">Logout</a></li>
+                        <li><a href="/dixit/" class="nav-link">Dixit</a></li>
+                        <li><a href="/logout/?next=/" class="nav-link">Logout</a></li>
                     {% else %}
                         <li><a href="/login/">Login</a></li>
                     {% endif %}
                 </ul>
                 {% if request.user.is_authenticated %}
                     <ul class="nav navbar-nav pull-right">
-                        <li> <a href="/change_password/">Hi, {{ request.user }} </a></li>
+                        <li> <a class="nav-link" href="/change_password/">Hi, {{ request.user }} </a></li>
                     </ul>
                 {% endif %}
             </div>
         </div>
     </nav>
-    <div class="container" style="margin-bottom:50px;">
+    <div class="container-main">
         {% if messages %}
             {% for message in messages %}
                 <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}" role="alert">

@@ -1,6 +1,7 @@
 import json
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels import auth
 from django.contrib.auth.models import User
 from .models import Room
 
@@ -10,16 +11,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
     room_group_name = None
     room = None
     user = None
+    user_in_room = None
 
     async def connect(self):
         self.room_name = self.scope['url_route']['kwargs']['session_id']
         self.room_group_name = 'chat_%s' % self.room_name
         self.room = await sync_to_async(Room.objects.get)(id=self.room_name)
+        self.user = await auth.get_user(self.scope)
 
         if self.room.full():
             await self.close()
         else:
-            await sync_to_async(self.room.add_connection)()
+            self.user_in_room = await sync_to_async(self.room.add_connection)(self.user)
             # Join room group
             await self.channel_layer.group_add(
                 self.room_group_name,
@@ -31,7 +34,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     'type': 'connections_changed',
                     'current_number': self.room.connections_number,
-                    'user_connected': str(self.scope["user"]),
+                    'user_connected': str(self.user),
                 }
             )
 
@@ -41,13 +44,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.room_group_name,
             self.channel_name
         )
-        await sync_to_async(self.room.remove_connection)()
+        await sync_to_async(self.user_in_room.delete)()
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 'type': 'connections_changed',
                 'current_number': self.room.connections_number,
-                'user_disconnected': str(self.scope["user"]),
+                'user_disconnected': str(self.user),
             }
         )
 
@@ -62,7 +65,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             {
                 'type': 'chat_message',
                 'message': message,
-                'from_user': str(self.scope["user"]),
+                'from_user': str(self.user),
             }
         )
 

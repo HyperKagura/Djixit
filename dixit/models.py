@@ -6,12 +6,21 @@ from django.dispatch import receiver
 
 ROOM_CONNECTIONS_LIMIT = 2
 
+ROOM_GAME_STATE_WAITING_PLAYERS = 0
+ROOM_GAME_STATE_HOST_PICKS_CARD = 1
+ROOM_GAME_STATE_OTHER_PICK_CARD = 2
+ROOM_GAME_STATE_VOTING = 3
+ROOM_GAME_STATE_ROUND_RESULT = 4
+
 
 class Room(models.Model):
     name = models.CharField(max_length=200)
     start_date = models.DateTimeField('date started')
     connections_number = models.IntegerField(default=0)
-    is_full = None
+    game_state = models.IntegerField(default=0, null=False)
+    num_people_action_needed = models.IntegerField(default=0, null=False)
+    round_host = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    is_full = models.BooleanField(default=False, null=False)
 
     def __init__(self, *args, **kwargs):
         super(Room, self).__init__(*args, **kwargs)
@@ -28,18 +37,20 @@ class Room(models.Model):
         """
         return str(self.id)
 
-    def add_connection(self):
+    def add_connection(self, user):
         self.connections_number += 1
-        self.save()
+        user_in_room = UsersInRoom.objects.create(user=user, room=self)
         self.is_full = self.full()
-
-    def remove_connection(self):
-        self.connections_number -= 1
         self.save()
-        self.is_full = self.full()
+        return user_in_room
 
     def full(self):
         return self.connections_number >= ROOM_CONNECTIONS_LIMIT
+
+
+class UsersInRoom(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
 
 
 class CardSet(models.Model):
@@ -74,6 +85,7 @@ class Card(models.Model):
 CARD_STATE_WAITING = 0
 CARD_STATE_IN_GAME = 1
 CARD_STATE_PLAYED = 2
+CARD_STATE_VOTE = 3
 
 
 class CardGame(models.Model):
@@ -99,6 +111,10 @@ class CardGame(models.Model):
         self.user_id = None
         self.save()
 
+    def set_state_vote(self):
+        self.card_state = CARD_STATE_VOTE
+        self.save()
+
     def set_state_played(self):
         self.card_state = CARD_STATE_PLAYED
         self.save()
@@ -122,3 +138,10 @@ def create_cards_in_set(instance, created, raw, **kwargs):
 @receiver(models.signals.pre_delete, sender=RoomCardSet)
 def remove_cards_from_game(instance, using, **kwargs):
     CardGame.objects.filter(card_set=instance.set, room=instance.room).delete()
+
+
+@receiver(models.signals.pre_delete, sender=UsersInRoom)
+def change_user_count(instance, using, **kwargs):
+    instance.room.connections_number -= 1
+    instance.room.is_full = instance.room.full()
+    instance.room.save()
