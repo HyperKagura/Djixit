@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.dispatch import receiver
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 # Create your models here.
 
@@ -56,8 +58,11 @@ class Room(models.Model):
 
 class UsersInRoom(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     is_host = models.BooleanField(default=False, null=False)
+
+    class Meta:
+        unique_together = ["room", "user"]
 
     def __str__(self):
         return str(self.room) + ": " + str(self.user) + "-" + str(self.id)
@@ -120,7 +125,7 @@ class CardGame(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     card_set = models.ForeignKey(CardSet, on_delete=models.CASCADE)
     card_state = models.IntegerField(default=0)  # 0 - waiting, 1 - in use
-    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+    user = models.ForeignKey(UsersInRoom, null=True, on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ["card", "room", "card_set"]
@@ -178,6 +183,7 @@ def change_user_count(instance, using, **kwargs):
         instance.room.game_state = ROOM_GAME_STATE_WAITING_PLAYERS
     instance.room.save()
 
+
 @receiver(models.signals.post_save, sender=Room)
 def on_game_state_update(instance, created, raw, **kwargs):
     if instance.game_state != instance.prev_game_state:
@@ -187,4 +193,11 @@ def on_game_state_update(instance, created, raw, **kwargs):
             else:
                 UsersInRoom.objects.get(room=instance, is_host=True).set_next_host()
         instance.prev_game_state = instance.game_state
+        async_to_sync(get_channel_layer().group_send)(
+            "chat_" + str(instance.id),
+            {
+                'type': 'game_state_changed',
+                'game_state': instance.game_state,
+            }
+        )
         instance.save()
