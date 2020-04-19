@@ -18,13 +18,15 @@ class Room(models.Model):
     start_date = models.DateTimeField('date started')
     connections_number = models.IntegerField(default=0)
     game_state = models.IntegerField(default=0, null=False)
+    prev_game_state = models.IntegerField(default=0, editable=False, null=False)
     num_people_action_needed = models.IntegerField(default=0, null=False)
-    round_host = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     is_full = models.BooleanField(default=False, null=False)
 
     def __init__(self, *args, **kwargs):
         super(Room, self).__init__(*args, **kwargs)
         self.is_full = self.full()
+        self.prev_game_state = self.game_state
+        self.save()
 
     def __str__(self):
         return self.name
@@ -44,6 +46,10 @@ class Room(models.Model):
         self.save()
         return user_in_room
 
+    def start_game(self):
+        self.game_state = ROOM_GAME_STATE_HOST_PICKS_CARD
+        self.save()
+
     def full(self):
         return self.connections_number >= ROOM_CONNECTIONS_LIMIT
 
@@ -51,6 +57,27 @@ class Room(models.Model):
 class UsersInRoom(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     user = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
+    is_host = models.BooleanField(default=False, null=False)
+
+    def __str__(self):
+        return str(self.room) + ": " + str(self.user) + "-" + str(self.id)
+
+    def set_host(self):
+        UsersInRoom.objects.filter(room=self.room).update(is_host=False)
+        self.is_host = True
+        self.save()
+
+    def set_next_host(self):
+        if self.is_host:
+            next_hosts = UsersInRoom.objects.filter(room=self.room, id__gt=self.id)
+            if len(next_hosts) == 0:  # set first user in room to be host
+                next_hosts = UsersInRoom.objects.filter(room=self.room)
+                if len(next_hosts) == 0:  # set first user in room to be host
+                    print("error: no users left in room")
+                    return
+            print("next host is" + str(next_hosts[0]))
+            next_hosts[0].set_host()
+
 
 
 class CardSet(models.Model):
@@ -142,6 +169,22 @@ def remove_cards_from_game(instance, using, **kwargs):
 
 @receiver(models.signals.pre_delete, sender=UsersInRoom)
 def change_user_count(instance, using, **kwargs):
+    if instance.is_host:
+        instance.set_next_host()
     instance.room.connections_number -= 1
     instance.room.is_full = instance.room.full()
+    if instance.room.connections_number <= 0:
+        instance.room.connections_number = 0
+        instance.room.game_state = ROOM_GAME_STATE_WAITING_PLAYERS
     instance.room.save()
+
+@receiver(models.signals.post_save, sender=Room)
+def on_game_state_update(instance, created, raw, **kwargs):
+    if instance.game_state != instance.prev_game_state:
+        if instance.game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
+            if instance.prev_game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
+                UsersInRoom.objects.filter(room=instance)[0].set_host()
+            else:
+                UsersInRoom.objects.get(room=instance, is_host=True).set_next_host()
+        instance.prev_game_state = instance.game_state
+        instance.save()
