@@ -44,6 +44,7 @@ class Room(models.Model):
 
 class CardSet(models.Model):
     name = models.CharField(max_length=200)
+    cards_number = models.IntegerField(default=0)
 
     def __str__(self):
         return self.name
@@ -64,9 +65,10 @@ class RoomCardSet(models.Model):
 
 class Card(models.Model):
     set = models.ForeignKey(CardSet, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200, default="", null=False)
 
     def __str__(self):
-        return "card_" + str(self.id)
+        return "card_" + self.name
 
 
 CARD_STATE_WAITING = 0
@@ -76,15 +78,16 @@ CARD_STATE_PLAYED = 2
 
 class CardGame(models.Model):
     card = models.ForeignKey(Card, on_delete=models.CASCADE)
-    room_card_set = models.ForeignKey(RoomCardSet, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    card_set = models.ForeignKey(CardSet, on_delete=models.CASCADE)
     card_state = models.IntegerField(default=0)  # 0 - waiting, 1 - in use
     user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
 
     class Meta:
-        unique_together = ["card", "room_card_set"]
+        unique_together = ["card", "room", "card_set"]
 
     def __str__(self):
-        return str(self.room_card_set) + " " + str(self.card)
+        return str(self.room) + ": " + str(self.card_set) + " " + str(self.card)
 
     def set_user(self, user_id):
         self.card_state = CARD_STATE_IN_GAME
@@ -106,4 +109,16 @@ def add_cards_to_game(instance, created, raw, **kwargs):
     if created:
         cards = Card.objects.filter(set=instance.set)
         for card in cards:
-            CardGame.objects.create(card=card, room_card_set=instance, card_state=CARD_STATE_WAITING)
+            CardGame.objects.create(card=card, room=instance.room, card_set=instance.set, card_state=CARD_STATE_WAITING)
+
+
+@receiver(models.signals.post_save, sender=CardSet)
+def create_cards_in_set(instance, created, raw, **kwargs):
+    if created:
+        for i in range(instance.cards_number):
+            Card.objects.create(set=instance, name=str(i+1))
+
+
+@receiver(models.signals.pre_delete, sender=RoomCardSet)
+def remove_cards_from_game(instance, using, **kwargs):
+    CardGame.objects.filter(card_set=instance.set, room=instance.room).delete()
