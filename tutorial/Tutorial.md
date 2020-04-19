@@ -15,3 +15,5 @@ Table of contents:
 **InstallPostgres.md** - *Installing Postgres database and configuring it for further use with Django*
 
 **InstallDjango.md** - *Install Django framework and create your project and admin user*
+
+**ProjectSetup.md** - *Install channels and configure project*
