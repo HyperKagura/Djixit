@@ -46,6 +46,13 @@ class Room(models.Model):
         user_in_room = UsersInRoom.objects.create(user=user, room=self)
         self.is_full = self.full()
         self.save()
+        async_to_sync(get_channel_layer().group_send)(
+            "chat_" + str(self.id),
+            {
+                'type': 'connections_changed',
+                'current_number': self.connections_number
+            }
+        )
         return user_in_room
 
     def start_game(self):
@@ -182,6 +189,13 @@ def change_user_count(instance, using, **kwargs):
         instance.room.connections_number = 0
         instance.room.game_state = ROOM_GAME_STATE_WAITING_PLAYERS
     instance.room.save()
+    async_to_sync(get_channel_layer().group_send)(
+        "chat_" + str(instance.room.id),
+        {
+            'type': 'connections_changed',
+            'current_number': instance.room.connections_number
+        }
+    )
 
 
 @receiver(models.signals.post_save, sender=Room)
