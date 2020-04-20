@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block main_content %}
-    {% if object.is_full %}
+    {% if object.is_full and not user_in_room %}
         <h3>Sorry, this room is full!</h3>
     {% else %}
         <div class="wrapper">
