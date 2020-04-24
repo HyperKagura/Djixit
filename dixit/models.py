@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.dispatch import receiver
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import random
 
 # Create your models here.
 
@@ -12,7 +13,7 @@ ROOM_GAME_STATE_WAITING_PLAYERS = 0
 ROOM_GAME_STATE_HOST_PICKS_CARD = 1
 ROOM_GAME_STATE_OTHER_PICK_CARD = 2
 ROOM_GAME_STATE_VOTING = 3
-ROOM_GAME_STATE_ROUND_RESULT = 4
+#ROOM_GAME_STATE_ROUND_RESULT = 4
 
 
 class Room(models.Model):
@@ -59,8 +60,15 @@ class Room(models.Model):
         self.game_state = ROOM_GAME_STATE_HOST_PICKS_CARD
         self.save()
 
+    def stop_game(self):
+        self.game_state = ROOM_GAME_STATE_WAITING_PLAYERS
+        self.save()
+
     def full(self):
         return self.connections_number >= ROOM_CONNECTIONS_LIMIT
+
+    def is_waiting(self):
+        return self.game_state == ROOM_GAME_STATE_WAITING_PLAYERS
 
 
 class UsersInRoom(models.Model):
@@ -94,7 +102,6 @@ class UsersInRoom(models.Model):
             next_hosts[0].set_host()
 
 
-
 class CardSet(models.Model):
     name = models.CharField(max_length=200)
     cards_number = models.IntegerField(default=0)
@@ -125,6 +132,9 @@ class Card(models.Model):
 
     def __str__(self):
         return "card" + self.name
+
+    def path(self):
+        return self.set.name + "/card" + self.name + ".jpg"
 
 
 CARD_STATE_WAITING = 0
@@ -217,10 +227,24 @@ def change_user_count(instance, using, **kwargs):
 def on_game_state_update(instance, created, raw, **kwargs):
     if instance.game_state != instance.prev_game_state:
         if instance.game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
+            cards = list(CardGame.objects.filter(room=instance, card_state=CARD_STATE_WAITING))
+            random.shuffle(cards)
+            users_in_room = UsersInRoom.objects.filter(room=instance)
+            users_num = users_in_room.count()
             if instance.prev_game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
-                UsersInRoom.objects.filter(room=instance)[0].set_host()
+                users_in_room[0].set_host()
+                for i, user in enumerate(users_in_room):
+                    for card in cards[i:users_num*6:users_num]:
+                        CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
             else:
                 UsersInRoom.objects.get(room=instance, is_host=True).set_next_host()
+                for i, user in enumerate(users_in_room):
+                    for card in cards[i:users_num:users_num]:
+                        CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
+        if instance.game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
+            CardGame.objects.filter(room=instance).update(card_state=CARD_STATE_WAITING, user=None)
+            UsersInRoom.objects.filter(room=instance).update(is_host=False, score=0, action_required=False)
+            CardVotes.objects.filter(room=instance).delete()
         instance.prev_game_state = instance.game_state
         async_to_sync(get_channel_layer().group_send)(
             "chat_" + str(instance.id),

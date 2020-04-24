@@ -19,6 +19,11 @@ class RoomView(LoginRequiredMixin, DetailView):
         print("user {} count is: {}".format(self.request.user, context["user_in_room"]))
         return context
 
+    def get_object(self):
+        obj = super().get_object()
+        obj.waiting_players = obj.is_waiting()
+        return obj
+
 
 class JoinRoomView(LoginRequiredMixin, DetailView):
     template_name = 'dixit/join_room.html'
@@ -49,5 +54,34 @@ class LeaveRoomView(LoginRequiredMixin, DetailView):
         UsersInRoom.objects.filter(user=self.request.user, room=room).delete()
         context = super().get_context_data(**kwargs)
         return context
+
+
+class StartGameView(LoginRequiredMixin, DetailView):
+    template_name = 'dixit/start_game.html'
+    model = Room
+
+    def get_context_data(self, **kwargs):
+        room = super().get_object()
+        context = super().get_context_data(**kwargs)
+        user_in_room = UsersInRoom.objects.filter(user=self.request.user, room=room).count()
+        context["user_in_room"] = user_in_room
+        if user_in_room:
+            room.start_game()
+        return context
+
+
+class StopGameView(LoginRequiredMixin, DetailView):
+    template_name = 'dixit/stop_game.html'
+    model = Room
+
+    def get_context_data(self, **kwargs):
+        room = super().get_object()
+        context = super().get_context_data(**kwargs)
+        user_in_room = UsersInRoom.objects.filter(user=self.request.user, room=room).count()
+        context["user_in_room"] = user_in_room
+        if user_in_room:
+            room.stop_game()
+        return context
+
 
 

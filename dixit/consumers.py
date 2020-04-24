@@ -3,8 +3,9 @@ from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels import auth
 from django.contrib.auth.models import User
-from .models import Room, UsersInRoom
-from .models import ROOM_GAME_STATE_WAITING_PLAYERS, ROOM_GAME_STATE_HOST_PICKS_CARD, ROOM_GAME_STATE_OTHER_PICK_CARD, ROOM_GAME_STATE_ROUND_RESULT, ROOM_GAME_STATE_VOTING
+from .models import Room, UsersInRoom, CardGame
+from .models import ROOM_GAME_STATE_WAITING_PLAYERS, ROOM_GAME_STATE_HOST_PICKS_CARD, ROOM_GAME_STATE_OTHER_PICK_CARD, ROOM_GAME_STATE_VOTING
+from .models import CARD_STATE_VOTE, CARD_STATE_IN_GAME
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -37,6 +38,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'user_connected': str(self.user),
             }
         )
+        await self.game_state_changed({"game_state": self.room.game_state})
 
     async def disconnect(self, close_code):
         # Leave room group
@@ -93,16 +95,59 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'from_user': from_field,
         }))
 
+    async def send_state_to_user(self, state, is_host, card_set, is_observer=False):
+        await self.send(text_data=json.dumps({
+            'type': 'state_update',
+            'state': state,
+            'is_host': is_host,
+            'is_observer': is_observer,
+            'card_set': card_set
+        }))
+
     async def game_state_changed(self, event):
         game_state = event["game_state"]
         if game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
+            if not self.user_in_room:
+                await self.send_msg_to_user("waiting for host to choose a card", "game")
+                await self.send_state_to_user("story", False, [], True)
+            else:
+                card_query = await sync_to_async(CardGame.objects.filter)(room=self.room, user=self.user_in_room,
+                                                                          card_state=CARD_STATE_IN_GAME)
+                card_set = await sync_to_async(lambda card_query: [card.card.path() for card in card_query])(card_query)
             if self.user_in_room.is_host:
                 await self.send_msg_to_user("you are the host, choose a card", "game")
+                await self.send_state_to_user("story", True, card_set)
             else:
                 await self.send_msg_to_user("waiting for host to choose a card", "game")
+                await self.send_state_to_user("story", False, card_set)
         elif game_state == ROOM_GAME_STATE_VOTING:
-            if self.user_in_room.is_host:
-                await self.send_msg_to_user("waiting for other players to choose a card", "game")
+            card_query = await sync_to_async(CardGame.objects.filter)(room=self.room, card_state=CARD_STATE_VOTE)
+            card_set = await sync_to_async(lambda card_query: [card.card.path() for card in card_query])(card_query)
+            if not self.user_in_room:
+                await self.send_msg_to_user("waiting for other players to vote", "game")
+                await self.send_state_to_user("vote", False, card_set, True)
             else:
-                await self.send_msg_to_user("choose a card", "game")
+
+                if self.user_in_room.is_host:
+                    await self.send_msg_to_user("waiting for other players to vote", "game")
+                    await self.send_state_to_user("vote", True, card_set)
+                else:
+                    await self.send_msg_to_user("vote for the card", "game")
+                    await self.send_state_to_user("vote", False, card_set)
+        elif game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
+            if not self.user_in_room:
+                await self.send_msg_to_user("waiting for other players to choose a card", "game")
+                await self.send_state_to_user("choice", False, [], True)
+            else:
+                card_query = await sync_to_async(CardGame.objects.filter)(room=self.room, user=self.user_in_room, card_state=CARD_STATE_IN_GAME)
+                card_set = await sync_to_async(lambda card_query: [card.card.path() for card in card_query])(card_query)
+                if (self.user_in_room is None) or self.user_in_room.is_host:
+                    await self.send_msg_to_user("waiting for other players to choose a card", "game")
+                    await self.send_state_to_user("choice", True, card_set)
+                else:
+                    await self.send_msg_to_user("choose a card", "game")
+                    await self.send_state_to_user("choice", False, card_set)
+        elif game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
+            await self.send_state_to_user("wait", False, [], True)
+            await self.send_msg_to_user("waiting for players", "game")
 
