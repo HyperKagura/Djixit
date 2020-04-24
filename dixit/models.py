@@ -42,8 +42,8 @@ class Room(models.Model):
         return str(self.id)
 
     def add_connection(self, user):
-        self.connections_number += 1
         user_in_room = UsersInRoom.objects.create(user=user, room=self)
+        self.connections_number = UsersInRoom.objects.filter(room=self).count()
         self.is_full = self.full()
         self.save()
         async_to_sync(get_channel_layer().group_send)(
@@ -195,10 +195,13 @@ def remove_cards_from_game(instance, using, **kwargs):
 def change_user_count(instance, using, **kwargs):
     if instance.is_host:
         instance.set_next_host()
-    instance.room.connections_number -= 1
+
+
+@receiver(models.signals.post_delete, sender=UsersInRoom)
+def change_user_count(instance, using, **kwargs):
+    instance.room.connections_number = UsersInRoom.objects.filter(room=instance.room).count()
     instance.room.is_full = instance.room.full()
-    if instance.room.connections_number <= 0:
-        instance.room.connections_number = 0
+    if instance.room.connections_number == 0:
         instance.room.game_state = ROOM_GAME_STATE_WAITING_PLAYERS
     instance.room.save()
     async_to_sync(get_channel_layer().group_send)(
