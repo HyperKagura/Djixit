@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block main_content %}
+    {% if room_is_full %}
+        <h3>Sorry, this room is full!</h3>
+        <meta http-equiv="Refresh" content="3; url=/dixit/{{ object.id }}/" />
+    {% else %}
+        <meta http-equiv="Refresh" content="0; url=/dixit/{{ object.id }}/" />
+    {% endif %}
+{% endblock %}

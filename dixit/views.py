@@ -13,6 +13,41 @@ class RoomView(LoginRequiredMixin, DetailView):
     model = Room
 
     def get_context_data(self, **kwargs):
+        room = super().get_object()
         context = super().get_context_data(**kwargs)
-        context["user_in_room"] = UsersInRoom.objects.filter(user=self.request.user).count()
+        context["user_in_room"] = UsersInRoom.objects.filter(user=self.request.user, room=room).count()
+        print("user {} count is: {}".format(self.request.user, context["user_in_room"]))
         return context
+
+
+class JoinRoomView(LoginRequiredMixin, DetailView):
+    template_name = 'dixit/join_room.html'
+    model = Room
+
+    def get_context_data(self, **kwargs):
+        room = super().get_object()
+        context = super().get_context_data(**kwargs)
+        user_in_room = UsersInRoom.objects.filter(user=self.request.user, room=room).count()
+        if user_in_room:
+            context["room_is_full"] = False
+            return context
+        else:
+            if room.is_full:
+                context["room_is_full"] = True
+            else:
+                room.add_connection(self.request.user)
+                context["room_is_full"] = False
+        return context
+
+
+class LeaveRoomView(LoginRequiredMixin, DetailView):
+    template_name = 'dixit/leave_room.html'
+    model = Room
+
+    def get_context_data(self, **kwargs):
+        room = super().get_object()
+        UsersInRoom.objects.filter(user=self.request.user, room=room).delete()
+        context = super().get_context_data(**kwargs)
+        return context
+
+

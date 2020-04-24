@@ -67,6 +67,9 @@ class UsersInRoom(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     is_host = models.BooleanField(default=False, null=False)
+    score = models.IntegerField(default=0, null=False)
+    is_online = models.BooleanField(default=False, null=False)
+    action_required = models.BooleanField(default=False, null=False)
 
     class Meta:
         unique_together = ["room", "user"]
@@ -117,8 +120,11 @@ class Card(models.Model):
     set = models.ForeignKey(CardSet, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, default="", null=False)
 
+    class Meta:
+        unique_together = ["set", "name"]
+
     def __str__(self):
-        return "card_" + self.name
+        return "card" + self.name
 
 
 CARD_STATE_WAITING = 0
@@ -157,6 +163,12 @@ class CardGame(models.Model):
     def set_state_played(self):
         self.card_state = CARD_STATE_PLAYED
         self.save()
+
+
+class CardVotes(models.Model):
+    user = models.ForeignKey(UsersInRoom, on_delete=models.CASCADE)
+    card = models.ForeignKey(Card, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
 
 
 @receiver(models.signals.post_save, sender=RoomCardSet)

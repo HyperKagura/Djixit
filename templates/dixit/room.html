@@ -1,18 +1,23 @@
 {% extends "base.html" %}
 
 {% block main_content %}
-    {% if object.is_full and not user_in_room %}
-        <h3>Sorry, this room is full!</h3>
-    {% else %}
+
         <div class="wrapper">
             <!-- Sidebar -->
             <div id="sidebar" class="bg-light">
+                {% if not user_in_room %}
+                    <a href="/dixit/{{ object.id }}/join" class="button">Join</a>
+                {% else %}
+                    <a href="/dixit/{{ object.id }}/leave" class="button">Leave</a>
+                {% endif %}
                 <div class="row">
                     <div class="col-lg-12">
                         <div>Users in room: <span id="connections-num"></span></div>
                         <div id="chat-log" class="pre-scrollable panel container-fluid bg-white"></div><br>
-                        <input id="chat-message-input" class="form-control" type="text" size="100"><br>
-                        <input id="chat-message-submit" type="button" class="btn" value="Send">
+                        {% if user_in_room %}
+                            <input id="chat-message-input" class="form-control" type="text" size="100"><br>
+                            <input id="chat-message-submit" type="button" class="btn" value="Send">
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -66,5 +71,4 @@
                 messageInputDom.value = '';
             };
         </script>
-    {% endif %}
 {% endblock %}
