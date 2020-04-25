@@ -2,10 +2,10 @@ import json
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels import auth
-from django.contrib.auth.models import User
 from .models import Room, UsersInRoom, CardGame, CardVotes
 from .models import ROOM_GAME_STATE_WAITING_PLAYERS, ROOM_GAME_STATE_HOST_PICKS_CARD, ROOM_GAME_STATE_OTHER_PICK_CARD, ROOM_GAME_STATE_VOTING
 from .models import CARD_STATE_VOTE, CARD_STATE_IN_GAME
+import random
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -22,7 +22,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.user = await auth.get_user(self.scope)
         try:
             self.user_in_room = await sync_to_async(UsersInRoom.objects.get)(room=self.room, user=self.user)
-        except UsersInRoom.DoesNotExist as e:
+        except Exception as e:
             self.user_in_room = None
         # Join room group
         await self.channel_layer.group_add(
@@ -120,6 +120,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
 
     async def send_state_to_user(self, state, is_host, card_set, story="", is_observer=False):
+        random.shuffle(card_set)
         await self.send(text_data=json.dumps({
             'type': 'state_update',
             'state': state,
@@ -133,7 +134,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         game_state = event["game_state"]
         try:
             self.user_in_room = await sync_to_async(UsersInRoom.objects.get)(room=self.room, user=self.user)
-        except UsersInRoom.DoesNotExist as e:
+        except Exception as e:
             self.user_in_room = None
         if game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
             if not self.user_in_room:

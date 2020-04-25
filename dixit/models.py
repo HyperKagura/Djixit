@@ -145,6 +145,7 @@ CARD_STATE_WAITING = 0
 CARD_STATE_IN_GAME = 1
 CARD_STATE_PLAYED = 2
 CARD_STATE_VOTE = 3
+CARD_STATE_VOTE_PREV = 4
 
 
 class CardGame(models.Model):
@@ -265,6 +266,8 @@ def on_game_state_update(instance, created, raw, **kwargs):
                 for i, user in enumerate(users_in_room):
                     for card in cards[i:users_num:users_num]:
                         CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
+                CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE_PREV).update(card_state=CARD_STATE_PLAYED)
+                CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE).update(card_state=CARD_STATE_VOTE_PREV)
         elif instance.game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
             CardGame.objects.filter(room=instance).update(card_state=CARD_STATE_WAITING, user=None)
             UsersInRoom.objects.filter(room=instance).update(is_host=False, score=0, action_required=False)

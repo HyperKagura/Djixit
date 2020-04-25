@@ -8,15 +8,18 @@ class HomeView(LoginRequiredMixin, ListView):
     template_name = 'dixit/home.html'
 
 
-class RoomView(LoginRequiredMixin, DetailView):
+class RoomView(DetailView):
     template_name = 'dixit/room.html'
     model = Room
 
     def get_context_data(self, **kwargs):
         room = super().get_object()
         context = super().get_context_data(**kwargs)
-        context["user_in_room"] = UsersInRoom.objects.filter(user=self.request.user, room=room).count()
-        print("user {} count is: {}".format(self.request.user, context["user_in_room"]))
+        try:
+            context["user_in_room"] = UsersInRoom.objects.filter(user=self.request.user, room=room).count()
+            print("user {} count is: {}".format(self.request.user, context["user_in_room"]))
+        except:
+            context["user_in_room"] = 0
         return context
 
     def get_object(self):
