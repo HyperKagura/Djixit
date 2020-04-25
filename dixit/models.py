@@ -94,9 +94,11 @@ class UsersInRoom(models.Model):
 
     def set_next_host(self):
         if self.is_host:
-            next_hosts = UsersInRoom.objects.filter(room=self.room, id__gt=self.id)
+            next_hosts = UsersInRoom.objects.filter(room=self.room, id__gt=self.id).order_by("id")
             if len(next_hosts) == 0:  # set first user in room to be host
-                next_hosts = UsersInRoom.objects.filter(room=self.room)
+                print("no hosts after")
+                next_hosts = UsersInRoom.objects.filter(room=self.room).order_by("id")
+                print(next_hosts)
                 if len(next_hosts) == 0:  # set first user in room to be host
                     print("error: no users left in room")
                     return
@@ -179,7 +181,7 @@ class CardGame(models.Model):
 
 class CardVotes(models.Model):
     user = models.ForeignKey(UsersInRoom, on_delete=models.CASCADE)
-    card = models.ForeignKey(Card, on_delete=models.CASCADE)
+    card = models.ForeignKey(CardGame, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
 
 
@@ -204,13 +206,13 @@ def remove_cards_from_game(instance, using, **kwargs):
 
 
 @receiver(models.signals.pre_delete, sender=UsersInRoom)
-def change_user_count(instance, using, **kwargs):
+def change_user_count_pre(instance, using, **kwargs):
     if instance.is_host:
         instance.set_next_host()
 
 
 @receiver(models.signals.post_delete, sender=UsersInRoom)
-def change_user_count(instance, using, **kwargs):
+def change_user_count_post(instance, using, **kwargs):
     instance.room.connections_number = UsersInRoom.objects.filter(room=instance.room).count()
     instance.room.is_full = instance.room.full()
     if instance.room.connections_number == 0:
@@ -229,6 +231,8 @@ def change_user_count(instance, using, **kwargs):
 def change_user_count(instance, using, **kwargs):
     print(str(instance), " action:", instance.action_required, "old:", instance.prev_action_required)
     if instance.action_required != instance.prev_action_required:
+        instance.prev_action_required = instance.action_required
+        instance.save()
         if instance.room.game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
             num_awaiting = UsersInRoom.objects.filter(room=instance.room, action_required=True).count()
             if num_awaiting == 0:
@@ -239,9 +243,6 @@ def change_user_count(instance, using, **kwargs):
             if num_awaiting == 0:
                 instance.room.game_state = ROOM_GAME_STATE_HOST_PICKS_CARD
                 instance.room.save()
-        instance.prev_action_required = instance.action_required
-        instance.save()
-
 
 
 @receiver(models.signals.post_save, sender=Room)
@@ -253,11 +254,13 @@ def on_game_state_update(instance, created, raw, **kwargs):
             users_in_room = UsersInRoom.objects.filter(room=instance)
             users_num = users_in_room.count()
             if instance.prev_game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
+                print("new game")
                 users_in_room[0].set_host()
                 for i, user in enumerate(users_in_room):
                     for card in cards[i:users_num*6:users_num]:
                         CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
             else:
+                print("next round")
                 UsersInRoom.objects.get(room=instance, is_host=True).set_next_host()
                 for i, user in enumerate(users_in_room):
                     for card in cards[i:users_num:users_num]:
@@ -268,7 +271,9 @@ def on_game_state_update(instance, created, raw, **kwargs):
             CardVotes.objects.filter(room=instance).delete()
         elif instance.game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
             UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
-            print("update require true")
+        elif instance.game_state == ROOM_GAME_STATE_VOTING:
+            UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
+            print("voting set actions true")
         instance.prev_game_state = instance.game_state
         async_to_sync(get_channel_layer().group_send)(
             "chat_" + str(instance.id),

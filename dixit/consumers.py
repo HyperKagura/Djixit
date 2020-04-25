@@ -3,7 +3,7 @@ from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels import auth
 from django.contrib.auth.models import User
-from .models import Room, UsersInRoom, CardGame
+from .models import Room, UsersInRoom, CardGame, CardVotes
 from .models import ROOM_GAME_STATE_WAITING_PLAYERS, ROOM_GAME_STATE_HOST_PICKS_CARD, ROOM_GAME_STATE_OTHER_PICK_CARD, ROOM_GAME_STATE_VOTING
 from .models import CARD_STATE_VOTE, CARD_STATE_IN_GAME
 
@@ -69,9 +69,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     print("story is {}, card_id is: {}".format(text_data_json['story'], text_data_json['choice']))
                     await sync_to_async(self.set_story_card)(text_data_json['story'], int(text_data_json['choice']))
             elif text_data_json['game-event'] == 'choice':
-                if not self.user_in_room.is_host:
+                if not self.user_in_room.is_host and self.user_in_room.action_required:
                     print("choice card_id is: {}".format(text_data_json['choice']))
                     await sync_to_async(self.set_choice_card)(int(text_data_json['choice']))
+            elif text_data_json['game-event'] == 'vote':
+                if not self.user_in_room.is_host and self.user_in_room.action_required:
+                    print("vote card_id is: {}".format(text_data_json['choice']))
+                    await sync_to_async(self.set_vote_card)(int(text_data_json['choice']))
         elif text_data_json['type'] == 'message':
             message = text_data_json['message']
             try:
@@ -127,6 +131,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def game_state_changed(self, event):
         game_state = event["game_state"]
+        try:
+            self.user_in_room = await sync_to_async(UsersInRoom.objects.get)(room=self.room, user=self.user)
+        except UsersInRoom.DoesNotExist as e:
+            self.user_in_room = None
         if game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
             if not self.user_in_room:
                 await self.send_msg_to_user("waiting for host to choose a card", "game")
@@ -190,10 +198,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             card = CardGame.objects.get(id=card_id, user=self.user_in_room)
             card.card_state = CARD_STATE_VOTE
+            print("choice 1")
             card.save()
+            print("choice 2")
+            self.user_in_room.action_required = False
+            print("choice 3")
+            self.user_in_room.save()
+            print("user choice change")
+        except Exception as e:
+            print(e)
+
+    def set_vote_card(self, card_id):
+        try:
+            card = CardGame.objects.get(id=card_id)
+            CardVotes.objects.create(card=card, user=self.user_in_room, room=self.room)
             self.user_in_room.action_required = False
             self.user_in_room.save()
-            print("user requere change")
+            print("user vote change")
         except Exception as e:
             print(e)
 

@@ -60,6 +60,7 @@
                         </div>
                         <div id="vote-do">
                             <h4>Vote for storyteller's card</h4>
+                            <input id="vote-submit" type="button" class="btn" value="Send">
                         </div>
                     </div>
                     <div id="wait" class="d-none">
@@ -226,6 +227,21 @@
                     chatSocket.send(JSON.stringify({
                         'type': 'game-event',
                         'game-event': 'choice',
+                        'choice': card.id
+                    }));
+                    $( ".my-choice" ).removeClass("my-choice");
+                }
+            };
+
+            document.querySelector('#vote-submit').onclick = function(e) {
+                const storyChoiceDom = document.querySelector('.my-choice');
+                if (!storyChoiceDom) {
+                    $( "#card-set" ).effect("shake", {distance: 5});
+                } else {
+                    const card = storyChoiceDom.getElementsByTagName("img")[0];
+                    chatSocket.send(JSON.stringify({
+                        'type': 'game-event',
+                        'game-event': 'vote',
                         'choice': card.id
                     }));
                     $( ".my-choice" ).removeClass("my-choice");
