@@ -250,6 +250,7 @@ def change_user_count(instance, using, **kwargs):
 def on_game_state_update(instance, created, raw, **kwargs):
     if instance.game_state != instance.prev_game_state:
         if instance.game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
+            print("models ROOM_GAME_STATE_HOST_PICKS_CARD")
             cards = list(CardGame.objects.filter(room=instance, card_state=CARD_STATE_WAITING))
             random.shuffle(cards)
             users_in_room = UsersInRoom.objects.filter(room=instance)
@@ -262,7 +263,26 @@ def on_game_state_update(instance, created, raw, **kwargs):
                         CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
             else:
                 print("next round")
-                UsersInRoom.objects.get(room=instance, is_host=True).set_next_host()
+                old_host = UsersInRoom.objects.get(room=instance, is_host=True)
+                host_card = CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE, user=old_host)[0]
+                host_votes = CardVotes.objects.filter(room=instance, card=host_card)
+                users = UsersInRoom.objects.filter(room=instance)
+                if host_votes.count() == users.count():  # all but host get +3
+                    for user in users:
+                        if user.id != old_host.id:
+                            user.score += 3
+                            user.save()
+                else:
+                    if host_votes.count() > 0:
+                        old_host.score += 3
+                        old_host.save()
+                    for vote in host_votes:
+                        vote.user.score += 3
+                        vote.user.save()
+                    for vote in CardVotes.objects.filter(room=instance, card__card_state=CARD_STATE_VOTE):
+                        vote.card.user.score += 1
+                        vote.card.user.save()
+                old_host.set_next_host()
                 for i, user in enumerate(users_in_room):
                     for card in cards[i:users_num:users_num]:
                         CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
@@ -273,8 +293,10 @@ def on_game_state_update(instance, created, raw, **kwargs):
             UsersInRoom.objects.filter(room=instance).update(is_host=False, score=0, action_required=False)
             CardVotes.objects.filter(room=instance).delete()
         elif instance.game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
+            print("models ROOM_GAME_STATE_OTHER_PICK_CARD")
             UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
         elif instance.game_state == ROOM_GAME_STATE_VOTING:
+            print("models ROOM_GAME_STATE_VOTING")
             UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
             print("voting set actions true")
         instance.prev_game_state = instance.game_state

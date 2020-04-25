@@ -75,6 +75,9 @@
                             <div id="card-6" class="card align-top d-inline-block"></div>
                             <div id="cardBig" class="align-top d-inline-block"></div>
                     </div>
+                    <div id="stats-card-set">
+
+                    </div>
                 </div>
                  <hr>
             </div>
@@ -110,6 +113,26 @@
                 }
                 else if (data.type === "connections_changed") {
                     document.querySelector('#connections-num').innerHTML = data.current_number;
+                }
+                else if (data.type === "stats_update") {
+                    let inner = '<table>';
+                    for (let i = 0; i < data.scores.length; ++i) {
+                        inner += '<tr><td>';
+                        inner += `${data.scores[i]["name"]} </td> <td> ${data.scores[i]["score"]}`;
+                        inner += '</td></tr>';
+                    }
+                    inner += '</table><div id="card-set">';
+                    for (let i = 0; i < data.card_set.length; ++i) {
+                        inner += `<div class="card align-top d-inline-block"><img height="200" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"`;
+                        inner += '<p>';
+                        for (let j = 0; j < data.card_set[i].users.length; ++j) {
+                            inner += `${data.card_set[i].users[j]} `;
+                        }
+                        inner += "</p></div>";
+                    }
+                    inner += '</div>';
+                    console.log(inner);
+                    document.querySelector('#stats-card-set').innerHTML = inner;
                 }
                 else if (data.type === "state_update") {
                     document.querySelector('#story').className = 'd-none';
