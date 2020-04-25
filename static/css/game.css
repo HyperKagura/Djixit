@@ -23,6 +23,10 @@
     box-shadow: 0 0px 0px rgba(0,0,236,.8) inset, 0 0 20px rgba(0,0,236,.9);
 }
 
+.my-card {
+  filter: grayscale(100%);
+}
+
 #sidebar {
     width: 20%;
     height: 100%;

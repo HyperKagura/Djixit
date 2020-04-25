@@ -156,7 +156,11 @@
                     }
                     let i = 0;
                     while (i < data.card_set.length) {
-                        document.querySelector(`#card-${i+1}`).innerHTML = (`<img height="200" id="${data.card_set[i]["id"]}" onclick="setChoice(${i})" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}">`);
+                        let classVal = ` onclick="setChoice(${i})"`;
+                        if (data.card_set[i]["my"] && data.state == "vote") {
+                            classVal = ' class="my-card"';
+                        }
+                        document.querySelector(`#card-${i + 1}`).innerHTML = (`<img height="200" id="${data.card_set[i]["id"]}" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"${classVal}>`);
                         ++i;
                     }
                     while (i < 6) {
