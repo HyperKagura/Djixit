@@ -79,6 +79,7 @@ class UsersInRoom(models.Model):
     score = models.IntegerField(default=0, null=False)
     is_online = models.BooleanField(default=False, null=False)
     action_required = models.BooleanField(default=False, null=False)
+    prev_action_required = models.BooleanField(default=False, null=False)
 
     class Meta:
         unique_together = ["room", "user"]
@@ -224,6 +225,25 @@ def change_user_count(instance, using, **kwargs):
     )
 
 
+@receiver(models.signals.post_save, sender=UsersInRoom)
+def change_user_count(instance, using, **kwargs):
+    print(str(instance), " action:", instance.action_required, "old:", instance.prev_action_required)
+    if instance.action_required != instance.prev_action_required:
+        if instance.room.game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
+            num_awaiting = UsersInRoom.objects.filter(room=instance.room, action_required=True).count()
+            if num_awaiting == 0:
+                instance.room.game_state = ROOM_GAME_STATE_VOTING
+                instance.room.save()
+        elif instance.room.game_state == ROOM_GAME_STATE_VOTING:
+            num_awaiting = UsersInRoom.objects.filter(room=instance.room, action_required=True).count()
+            if num_awaiting == 0:
+                instance.room.game_state = ROOM_GAME_STATE_HOST_PICKS_CARD
+                instance.room.save()
+        instance.prev_action_required = instance.action_required
+        instance.save()
+
+
+
 @receiver(models.signals.post_save, sender=Room)
 def on_game_state_update(instance, created, raw, **kwargs):
     if instance.game_state != instance.prev_game_state:
@@ -242,10 +262,13 @@ def on_game_state_update(instance, created, raw, **kwargs):
                 for i, user in enumerate(users_in_room):
                     for card in cards[i:users_num:users_num]:
                         CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
-        if instance.game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
+        elif instance.game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
             CardGame.objects.filter(room=instance).update(card_state=CARD_STATE_WAITING, user=None)
             UsersInRoom.objects.filter(room=instance).update(is_host=False, score=0, action_required=False)
             CardVotes.objects.filter(room=instance).delete()
+        elif instance.game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
+            UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
+            print("update require true")
         instance.prev_game_state = instance.game_state
         async_to_sync(get_channel_layer().group_send)(
             "chat_" + str(instance.id),

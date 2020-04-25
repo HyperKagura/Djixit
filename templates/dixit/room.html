@@ -43,8 +43,10 @@
                         </div>
                     </div>
                     <div id="choice" class="d-none">
+                        <div id="choice-story"></div>
                         <div id="choice-wait">
                             <h4>Waiting for other players to choose a card</h4>
+                            <div id="choice-story"></div>
                         </div>
                         <div id="choice-do">
                             <h4>Choose a card to suit the story</h4>
@@ -52,6 +54,7 @@
                         </div>
                     </div>
                     <div id="vote" class="d-none">
+                        <div id="vote-story"></div>
                         <div id="vote-wait">
                             <h4>Waiting for other players to vote</h4>
                         </div>
@@ -116,6 +119,7 @@
                          document.querySelector('#wait').className = 'd-block';
                     }
                     else if (data.state == "choice") {
+                        document.querySelector('#choice-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
                         if (data.is_observer || data.is_host) {
                             document.querySelector('#choice-wait').className = 'd-block';
                             document.querySelector('#choice-do').className = 'd-none';
@@ -127,6 +131,7 @@
                         document.querySelector('#choice').className = 'd-block';
                     }
                     else if (data.state == "vote") {
+                        document.querySelector('#vote-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
                         if (data.is_observer || data.is_host) {
                             document.querySelector('#vote-wait').className = 'd-block';
                             document.querySelector('#vote-do').className = 'd-none';
@@ -208,6 +213,22 @@
                         'choice': card.id
                     }));
                     storyInputDom.value = '';
+                    $( ".my-choice" ).removeClass("my-choice");
+                }
+            };
+
+            document.querySelector('#choice-submit').onclick = function(e) {
+                const storyChoiceDom = document.querySelector('.my-choice');
+                if (!storyChoiceDom) {
+                    $( "#card-set" ).effect("shake", {distance: 5});
+                } else {
+                    const card = storyChoiceDom.getElementsByTagName("img")[0];
+                    chatSocket.send(JSON.stringify({
+                        'type': 'game-event',
+                        'game-event': 'choice',
+                        'choice': card.id
+                    }));
+                    $( ".my-choice" ).removeClass("my-choice");
                 }
             };
 
