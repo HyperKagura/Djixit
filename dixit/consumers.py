@@ -58,18 +58,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Receive message from WebSocket
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
-        message = text_data_json['message']
+        if text_data_json['type'] == 'game-event':
+            if text_data_json['game-event'] == 'story':
+                print("story is {}".format(text_data_json['story']))
+        elif text_data_json['type'] == 'message':
+            message = text_data_json['message']
 
-        if self.user_in_room:
-            # Send message to room group
-            await self.channel_layer.group_send(
-                self.room_group_name,
-                {
-                    'type': 'chat_message',
-                    'message': message,
-                    'from_user': str(self.user),
-                }
-            )
+            if self.user_in_room:
+                # Send message to room group
+                await self.channel_layer.group_send(
+                    self.room_group_name,
+                    {
+                        'type': 'chat_message',
+                        'message': message,
+                        'from_user': str(self.user),
+                    }
+                )
 
     # Receive change of connections
     async def connections_changed(self, event):

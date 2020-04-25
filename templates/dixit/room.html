@@ -32,6 +32,45 @@
                 <!-- We'll fill this with dummy content -->
                  <h3>Welcome to {{ object.name }}!</h3>
                 <div id="game-content">
+                    <div id="story" class="d-none">
+                        <div id="story-write">
+                            <h4>Create a story</h4>
+                            <input id="story-input" class="form-control" type="text" size="100">
+                            <input id="story-submit" type="button" class="btn" value="Send">
+                        </div>
+                        <div id="story-wait">
+                            <h4>Waiting for storyteller to pick a card</h4>
+                        </div>
+                    </div>
+                    <div id="choice" class="d-none">
+                        <div id="choice-wait">
+                            <h4>Waiting for other players to choose a card</h4>
+                        </div>
+                        <div id="choice-do">
+                            <h4>Choose a card to suit the story</h4>
+                        </div>
+                    </div>
+                    <div id="vote" class="d-none">
+                        <div id="vote-wait">
+                            <h4>Waiting for other players to vote</h4>
+                        </div>
+                        <div id="vote-do">
+                            <h4>Vote for storyteller's card</h4>
+                        </div>
+                    </div>
+                    <div id="wait" class="d-none">
+                        <h4>Waiting for game to start</h4>
+                    </div>
+                    <div id="card-set">
+                        <table><tr>
+                            <td id="card-1"></td>
+                            <td id="card-2"></td>
+                            <td id="card-3"></td>
+                            <td id="card-4"></td>
+                            <td id="card-5"></td>
+                            <td id="card-6"></td>
+                        </tr></table>
+                    </div>
                 </div>
                  <hr>
             </div>
@@ -57,48 +96,55 @@
                     document.querySelector('#connections-num').innerHTML = data.current_number;
                 }
                 else if (data.type === "state_update") {
+                    document.querySelector('#story').className = 'd-none';
+                    document.querySelector('#vote').className = 'd-none';
+                    document.querySelector('#wait').className = 'd-none';
+                    document.querySelector('#choice').className = 'd-none';
                     if (data.state == "wait") {
-                         document.querySelector('#game-content').innerHTML = ('<h4>Waiting for game to start</h4>');
+                         document.querySelector('#wait').className = 'd-block';
                     }
                     else if (data.state == "choice") {
-                        if (data.is_observer) {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Waiting for other players to choose a card</h4>');
-                        }
-                        else if (data.is_host) {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Waiting for other players to choose a card</h4>');
+                        if (data.is_observer || data.is_host) {
+                            document.querySelector('#choice-wait').className = 'd-block';
+                            document.querySelector('#choice-do').className = 'd-none';
                         }
                         else {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Choose a card to suit the story</h4>');
+                            document.querySelector('#choice-wait').className = 'd-none';
+                            document.querySelector('#choice-do').className = 'd-block';
                         }
-
+                        document.querySelector('#choice').className = 'd-block';
                     }
                     else if (data.state == "vote") {
-                        if (data.is_observer) {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Waiting for other players to vote</h4>');
-                        }
-                        else if (data.is_host) {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Waiting for other players to vote</h4>');
+                        if (data.is_observer || data.is_host) {
+                            document.querySelector('#vote-wait').className = 'd-block';
+                            document.querySelector('#vote-do').className = 'd-none';
                         }
                         else {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Vote for storyteller\'s card</h4>');
+                            document.querySelector('#vote-wait').className = 'd-none';
+                            document.querySelector('#vote-do').className = 'd-block';
                         }
+                        document.querySelector('#vote').className = 'd-block';
                     }
                     else if (data.state == "story") {
-                        if (data.is_observer) {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Waiting for storyteller to pick a card</h4>');
-                        }
-                        else if (data.is_host) {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Create a story</h4>');
+                        if (data.is_host) {
+                            document.querySelector('#story-write').className = 'd-block';
+                            document.querySelector('#story-wait').className = 'd-none';
                         }
                         else {
-                            document.querySelector('#game-content').innerHTML = ('<h4>Waiting for storyteller to pick a card</h4>');
+                            document.querySelector('#story-write').className = 'd-none';
+                            document.querySelector('#story-wait').className = 'd-block';
                         }
+                        document.querySelector('#story').className = 'd-block';
                     }
-                    document.querySelector('#game-content').innerHTML += ('<table><tr>');
-                    for (let i = 0; i < data.card_set.length; i++) {
-                        document.querySelector('#game-content').innerHTML += ('<td><img height="100" src="/static/img/dixit/' + data.card_set[i] + '"><td>');
+                    let i = 0;
+                    while (i < data.card_set.length) {
+                        document.querySelector(`#card-${i+1}`).innerHTML = ('<img height="200" src="/static/img/dixit/' + data.card_set[i] + '">');
+                        ++i;
                     }
-                    document.querySelector('#game-content').innerHTML += ('</tr></table>');
+                    while (i < 6) {
+                        document.querySelector(`#card-${i+1}`).innerHTML = ('');
+                        ++i;
+                    }
                 }
             };
 
@@ -116,10 +162,38 @@
             document.querySelector('#chat-message-submit').onclick = function(e) {
                 const messageInputDom = document.querySelector('#chat-message-input');
                 const message = messageInputDom.value;
-                chatSocket.send(JSON.stringify({
-                    'message': message
-                }));
-                messageInputDom.value = '';
+                if (message.length <= 0) {
+                    $( "#chat-message-input" ).effect("shake", {distance: 5});
+                } else {
+                    chatSocket.send(JSON.stringify({
+                        'type': 'message',
+                        'message': message
+                    }));
+                    messageInputDom.value = '';
+                }
             };
+
+            document.querySelector('#story-input').onkeyup = function(e) {
+                if (e.keyCode === 13) {  // enter, return
+                    document.querySelector('#story-submit').click();
+                }
+            };
+
+            document.querySelector('#story-submit').onclick = function(e) {
+                const storyInputDom = document.querySelector('#story-input');
+                const story = storyInputDom.value;
+                if (story.length <= 0) {
+                    $( "#story-input" ).effect("shake", {distance: 5});
+                } else {
+                    chatSocket.send(JSON.stringify({
+                        'type': 'game-event',
+                        'game-event': 'story',
+                        'story': story
+                    }));
+                    storyInputDom.value = '';
+                }
+            };
+
+
         </script>
 {% endblock %}
