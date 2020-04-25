@@ -59,8 +59,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
         if text_data_json['type'] == 'game-event':
+            self.user_in_room = await sync_to_async(UsersInRoom.objects.get)(room=self.room, user=self.user)
             if text_data_json['game-event'] == 'story':
-                print("story is {}".format(text_data_json['story']))
+                if self.user_in_room.is_host:
+                    print("story is {}, card_id is: {}".format(text_data_json['story'], text_data_json['choice']))
+                    await sync_to_async(self.set_story_card)(text_data_json['story'], int(text_data_json['choice']))
+
         elif text_data_json['type'] == 'message':
             message = text_data_json['message']
 
@@ -117,7 +121,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             else:
                 card_query = await sync_to_async(CardGame.objects.filter)(room=self.room, user=self.user_in_room,
                                                                           card_state=CARD_STATE_IN_GAME)
-                card_set = await sync_to_async(lambda card_query: [card.card.path() for card in card_query])(card_query)
+                card_set = await sync_to_async(lambda card_query: [{"id": card.id, "path": card.card.path()} for card in card_query])(card_query)
             if self.user_in_room.is_host:
                 await self.send_msg_to_user("you are the host, choose a card", "game")
                 await self.send_state_to_user("story", True, card_set)
@@ -126,7 +130,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.send_state_to_user("story", False, card_set)
         elif game_state == ROOM_GAME_STATE_VOTING:
             card_query = await sync_to_async(CardGame.objects.filter)(room=self.room, card_state=CARD_STATE_VOTE)
-            card_set = await sync_to_async(lambda card_query: [card.card.path() for card in card_query])(card_query)
+            card_set = await sync_to_async(lambda card_query: [{"id": card.id, "path": card.card.path()} for card in card_query])(card_query)
             if not self.user_in_room:
                 await self.send_msg_to_user("waiting for other players to vote", "game")
                 await self.send_state_to_user("vote", False, card_set, True)
@@ -144,7 +148,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.send_state_to_user("choice", False, [], True)
             else:
                 card_query = await sync_to_async(CardGame.objects.filter)(room=self.room, user=self.user_in_room, card_state=CARD_STATE_IN_GAME)
-                card_set = await sync_to_async(lambda card_query: [card.card.path() for card in card_query])(card_query)
+                card_set = await sync_to_async(lambda card_query: [{"id": card.id, "path": card.card.path()} for card in card_query])(card_query)
                 if (self.user_in_room is None) or self.user_in_room.is_host:
                     await self.send_msg_to_user("waiting for other players to choose a card", "game")
                     await self.send_state_to_user("choice", True, card_set)
@@ -154,4 +158,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
             await self.send_state_to_user("wait", False, [], True)
             await self.send_msg_to_user("waiting for players", "game")
+
+
+    def set_story_card(self, story, card_id):
+        card = CardGame.objects.get(id=card_id, user=self.user_in_room)
+        card.card_state = CARD_STATE_VOTE
+        card.save()
+        self.room.story = story
+        self.room.game_state = ROOM_GAME_STATE_OTHER_PICK_CARD
+        self.room.save()
 

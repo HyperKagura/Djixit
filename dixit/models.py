@@ -24,6 +24,7 @@ class Room(models.Model):
     prev_game_state = models.IntegerField(default=0, editable=False, null=False)
     num_people_action_needed = models.IntegerField(default=0, null=False)
     is_full = models.BooleanField(default=False, null=False)
+    story = models.CharField(max_length=255)
 
     def __init__(self, *args, **kwargs):
         super(Room, self).__init__(*args, **kwargs)

@@ -48,6 +48,7 @@
                         </div>
                         <div id="choice-do">
                             <h4>Choose a card to suit the story</h4>
+                            <input id="choice-submit" type="button" class="btn" value="Send">
                         </div>
                     </div>
                     <div id="vote" class="d-none">
@@ -62,14 +63,13 @@
                         <h4>Waiting for game to start</h4>
                     </div>
                     <div id="card-set">
-                        <table><tr>
-                            <td id="card-1"></td>
-                            <td id="card-2"></td>
-                            <td id="card-3"></td>
-                            <td id="card-4"></td>
-                            <td id="card-5"></td>
-                            <td id="card-6"></td>
-                        </tr></table>
+                            <div id="card-1" class="card align-top d-inline-block"></div>
+                            <div id="card-2" class="card align-top d-inline-block"></div>
+                            <div id="card-3" class="card align-top d-inline-block"></div>
+                            <div id="card-4" class="card align-top d-inline-block"></div>
+                            <div id="card-5" class="card align-top d-inline-block"></div>
+                            <div id="card-6" class="card align-top d-inline-block"></div>
+                            <div id="cardBig" class="align-top d-inline-block"></div>
                     </div>
                 </div>
                  <hr>
@@ -79,6 +79,18 @@
 
 
         <script>
+            function showBigCard(i) {
+                $("#cardBig").html('<img height="600" src="/static/img/dixit/' + i + '">');
+                $("#cardBig").show();
+            }
+
+            function setChoice(j) {
+                for (let i = 0; i < 6; ++i) {
+                    $(`#card-${i+1}`).removeClass("my-choice");
+                }
+                $(`#card-${j+1}`).addClass("my-choice");
+            }
+
             const chatSocket = new WebSocket(
                 'ws://'
                 + window.location.host
@@ -138,7 +150,7 @@
                     }
                     let i = 0;
                     while (i < data.card_set.length) {
-                        document.querySelector(`#card-${i+1}`).innerHTML = ('<img height="200" src="/static/img/dixit/' + data.card_set[i] + '">');
+                        document.querySelector(`#card-${i+1}`).innerHTML = (`<img height="200" id="${data.card_set[i]["id"]}" onclick="setChoice(${i})" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}">`);
                         ++i;
                     }
                     while (i < 6) {
@@ -182,13 +194,18 @@
             document.querySelector('#story-submit').onclick = function(e) {
                 const storyInputDom = document.querySelector('#story-input');
                 const story = storyInputDom.value;
+                const storyChoiceDom = document.querySelector('.my-choice');
                 if (story.length <= 0) {
                     $( "#story-input" ).effect("shake", {distance: 5});
+                } else if (!storyChoiceDom) {
+                    $( "#card-set" ).effect("shake", {distance: 5});
                 } else {
+                    const card = storyChoiceDom.getElementsByTagName("img")[0];
                     chatSocket.send(JSON.stringify({
                         'type': 'game-event',
                         'game-event': 'story',
-                        'story': story
+                        'story': story,
+                        'choice': card.id
                     }));
                     storyInputDom.value = '';
                 }
