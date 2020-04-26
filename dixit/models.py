@@ -138,7 +138,7 @@ class Card(models.Model):
         return "card" + self.name
 
     def path(self):
-        return self.set.name + "/card" + self.name + ".jpg"
+        return self.set.name + "/card" + self.name + ".png"
 
 
 CARD_STATE_WAITING = 0

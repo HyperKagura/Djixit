@@ -51,3 +51,6 @@ MANIFEST
 #   install all needed dependencies.
 #Pipfile.lock
 /dixit/migrations/
+
+*.nc
+*.DS_store
