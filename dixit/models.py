@@ -22,7 +22,8 @@ class Room(models.Model):
     prev_game_state = models.IntegerField(default=0, editable=False, null=False)
     num_people_action_needed = models.IntegerField(default=0, null=False)
     is_full = models.BooleanField(default=False, null=False)
-    story = models.CharField(max_length=255, )
+    story = models.CharField(max_length=255, default="")
+    prev_story = models.CharField(max_length=255, default="")
     max_players = models.IntegerField(default=7, null=False)
 
     def __init__(self, *args, **kwargs):
@@ -252,6 +253,7 @@ def change_user_count(instance, using, **kwargs):
 def on_game_state_update(instance, created, raw, **kwargs):
     if instance.game_state != instance.prev_game_state:
         if instance.game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
+            instance.prev_story = instance.story
             print("models ROOM_GAME_STATE_HOST_PICKS_CARD")
             cards = list(CardGame.objects.filter(room=instance, card_state=CARD_STATE_WAITING))
             random.shuffle(cards)
@@ -310,6 +312,7 @@ def on_game_state_update(instance, created, raw, **kwargs):
             UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
             print("voting set actions true")
         instance.prev_game_state = instance.game_state
+        instance.save()
         async_to_sync(get_channel_layer().group_send)(
             "chat_" + str(instance.id),
             {
@@ -317,4 +320,3 @@ def on_game_state_update(instance, created, raw, **kwargs):
                 'game_state': instance.game_state,
             }
         )
-        instance.save()

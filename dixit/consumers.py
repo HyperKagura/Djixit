@@ -295,6 +295,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'type': 'stats_update',
             'scores': stats,
             'card_set': card_votes,
+            'story': self.room.prev_story,
             'stack': cards_left
         }))
 

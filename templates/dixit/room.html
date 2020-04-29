@@ -69,7 +69,8 @@
                     </div>
                     <div id="card-set" class="container">
                     </div>
-                    <h4>Previous round votes:</h4>
+                    <div id="prev-story"></div>
+                    <h5>Previous round votes:</h5>
                     <div id="stats-card-set" class="container">
                     </div>
                 </div>
@@ -115,6 +116,7 @@
                     }
                     innerScores += '</table>';
                     document.querySelector('#stats-scores').innerHTML = innerScores;
+                    document.querySelector('#prev-story').innerHTML = `<h4>Previous story was: ${data.story}</h4>`;
                     document.querySelector('#cards-left').innerHTML = `<h5>Cards left: ${data.stack}</h5>`;
                     let inner = '<div id="card-set">';
                     for (let i = 0; i < data.card_set.length; ++i) {
