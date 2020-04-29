@@ -7,8 +7,6 @@ import random
 
 # Create your models here.
 
-ROOM_CONNECTIONS_LIMIT = 12
-
 ROOM_GAME_STATE_WAITING_PLAYERS = 0
 ROOM_GAME_STATE_HOST_PICKS_CARD = 1
 ROOM_GAME_STATE_OTHER_PICK_CARD = 2
@@ -25,6 +23,7 @@ class Room(models.Model):
     num_people_action_needed = models.IntegerField(default=0, null=False)
     is_full = models.BooleanField(default=False, null=False)
     story = models.CharField(max_length=255, )
+    max_players = models.IntegerField(default=7, null=False)
 
     def __init__(self, *args, **kwargs):
         super(Room, self).__init__(*args, **kwargs)
@@ -48,13 +47,13 @@ class Room(models.Model):
         self.connections_number = UsersInRoom.objects.filter(room=self).count()
         self.is_full = self.full()
         self.save()
-        async_to_sync(get_channel_layer().group_send)(
-            "chat_" + str(self.id),
-            {
-                'type': 'connections_changed',
-                'current_number': self.connections_number
-            }
-        )
+        #async_to_sync(get_channel_layer().group_send)(
+        #    "chat_" + str(self.id),
+        #    {
+        #        'type': 'connections_changed',
+        #        'current_number': self.connections_number
+        #    }
+        #)
         return user_in_room
 
     def start_game(self):
@@ -66,7 +65,7 @@ class Room(models.Model):
         self.save()
 
     def full(self):
-        return self.connections_number >= ROOM_CONNECTIONS_LIMIT
+        return self.connections_number >= self.max_players
 
     def is_waiting(self):
         return self.game_state == ROOM_GAME_STATE_WAITING_PLAYERS
@@ -77,6 +76,7 @@ class UsersInRoom(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     is_host = models.BooleanField(default=False, null=False)
     score = models.IntegerField(default=0, null=False)
+    round_score = models.IntegerField(default=0, null=False)
     is_online = models.BooleanField(default=False, null=False)
     action_required = models.BooleanField(default=False, null=False)
     prev_action_required = models.BooleanField(default=False, null=False)
@@ -90,6 +90,7 @@ class UsersInRoom(models.Model):
     def set_host(self):
         UsersInRoom.objects.filter(room=self.room).update(is_host=False)
         self.is_host = True
+        self.action_required = True
         self.save()
 
     def set_next_host(self):
@@ -152,8 +153,9 @@ class CardGame(models.Model):
     card = models.ForeignKey(Card, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     card_set = models.ForeignKey(CardSet, on_delete=models.CASCADE)
-    card_state = models.IntegerField(default=0)  # 0 - waiting, 1 - in use
+    card_state = models.IntegerField(default=0, null=False)  # 0 - waiting, 1 - in use
     user = models.ForeignKey(UsersInRoom, null=True, on_delete=models.SET_NULL)
+    hosts_card = models.BooleanField(default=False, null=False)  # set to True when host picks this card
 
     class Meta:
         unique_together = ["card", "room", "card_set"]
@@ -219,13 +221,13 @@ def change_user_count_post(instance, using, **kwargs):
     if instance.room.connections_number == 0:
         instance.room.game_state = ROOM_GAME_STATE_WAITING_PLAYERS
     instance.room.save()
-    async_to_sync(get_channel_layer().group_send)(
-        "chat_" + str(instance.room.id),
-        {
-            'type': 'connections_changed',
-            'current_number': instance.room.connections_number
-        }
-    )
+    #async_to_sync(get_channel_layer().group_send)(
+    #    "chat_" + str(instance.room.id),
+    #    {
+    #        'type': 'connections_changed',
+    #        'current_number': instance.room.connections_number
+    #    }
+    #)
 
 
 @receiver(models.signals.post_save, sender=UsersInRoom)
@@ -267,20 +269,28 @@ def on_game_state_update(instance, created, raw, **kwargs):
                 host_card = CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE, user=old_host)[0]
                 host_votes = CardVotes.objects.filter(room=instance, card=host_card)
                 users = UsersInRoom.objects.filter(room=instance)
-                if host_votes.count() == users.count():  # all but host get +3
+                if host_votes.count() == users.count() - 1:  # all but host get +3
                     for user in users:
                         if user.id != old_host.id:
+                            user.round_score = 3
                             user.score += 3
                             user.save()
+                        else:
+                            old_host.round_score = 0
+                            old_host.save()
                 else:
+                    users.update(round_score=0)
                     if host_votes.count() > 0:
                         old_host.score += 3
+                        old_host.round_score = 3
                         old_host.save()
                     for vote in host_votes:
                         vote.user.score += 3
+                        vote.user.round_score += 3
                         vote.user.save()
                     for vote in CardVotes.objects.filter(room=instance, card__card_state=CARD_STATE_VOTE):
                         vote.card.user.score += 1
+                        vote.card.user.round_score += 1
                         vote.card.user.save()
                 old_host.set_next_host()
                 for i, user in enumerate(users_in_room):

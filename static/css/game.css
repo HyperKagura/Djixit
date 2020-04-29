@@ -2,7 +2,6 @@
 .wrapper {
     display: flex;
     width: 100%;
-    height: 100%;
 }
 
 .content-main {
@@ -16,7 +15,9 @@
 }
 
 .container {
-  width: 100%;
+    width: 100%;
+    margin-bottom: 10px;
+    margin-top: 10px;
 }
 
 .my-choice {
@@ -27,18 +28,22 @@
   filter: grayscale(100%);
 }
 
+.story-card {
+  box-shadow: 0 0px 0px rgba(0,236,0,.8) inset, 0 0 20px rgba(0,236,0,.9);
+}
+
 #sidebar {
-    width: 20%;
-    height: 100%;
+    width: 25%;
     position: relative;
     padding: 10px;
 }
 
 #content {
   position: relative;
-  width: 80%;
+  width: 60%;
 }
 
 #chat-log {
-  min-height: 600px;
+    overflow: hidden;
+    min-height: 600px;
 }

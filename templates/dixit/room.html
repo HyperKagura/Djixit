@@ -17,7 +17,8 @@
                 {% endif %}
                 <div class="row">
                     <div class="col-lg-12">
-                        <div>Users in room: <span id="connections-num"></span></div>
+                        <div id="cards-left"></div>
+                        <div id="stats-scores"></div>
                         <div id="chat-log" class="pre-scrollable panel container-fluid bg-white"></div><br>
                         {% if user_in_room %}
                             <input id="chat-message-input" class="form-control" type="text" size="100"><br>
@@ -28,7 +29,7 @@
             </div>
 
             <!-- Page Content -->
-            <div id="content" class="content-main container-fluid">
+            <div id="content" class="content-main">
                 <!-- We'll fill this with dummy content -->
                  <h3>Welcome to {{ object.name }}!</h3>
                 <div id="game-content">
@@ -39,7 +40,6 @@
                             <input id="story-submit" type="button" class="btn" value="Send">
                         </div>
                         <div id="story-wait">
-                            <h4>Waiting for storyteller to pick a card</h4>
                         </div>
                     </div>
                     <div id="choice" class="d-none">
@@ -54,7 +54,8 @@
                         </div>
                     </div>
                     <div id="vote" class="d-none">
-                        <div id="vote-story"></div>
+                        <div id="vote-story">
+                        </div>
                         <div id="vote-wait">
                             <h4>Waiting for other players to vote</h4>
                         </div>
@@ -66,28 +67,23 @@
                     <div id="wait" class="d-none">
                         <h4>Waiting for game to start</h4>
                     </div>
-                    <div id="card-set">
-                            <div id="card-1" class="card align-top d-inline-block"></div>
-                            <div id="card-2" class="card align-top d-inline-block"></div>
-                            <div id="card-3" class="card align-top d-inline-block"></div>
-                            <div id="card-4" class="card align-top d-inline-block"></div>
-                            <div id="card-5" class="card align-top d-inline-block"></div>
-                            <div id="card-6" class="card align-top d-inline-block"></div>
-                            <div id="cardBig" class="align-top d-inline-block"></div>
+                    <div id="card-set" class="container">
                     </div>
-                    <div id="stats-card-set">
-
+                    <h4>Previous round votes:</h4>
+                    <div id="stats-card-set" class="container">
                     </div>
                 </div>
                  <hr>
             </div>
-
+            <div id="sidebar">
+                <div id="cardBig" class="align-top d-inline-block"></div>
+            </div>
         </div>
 
 
         <script>
             function showBigCard(i) {
-                $("#cardBig").html('<img height="600" src="/static/img/dixit/' + i + '">');
+                $("#cardBig").html('<img width="100%" src="/static/img/dixit/' + i + '">');
                 $("#cardBig").show();
             }
 
@@ -110,20 +106,23 @@
                 const data = JSON.parse(e.data);
                 if (data.type === "chat_message") {
                     document.querySelector('#chat-log').innerHTML += ('<p><b>' + data.from_user + ':</b> ' + data.message + '</p>');
-                }
-                else if (data.type === "connections_changed") {
-                    document.querySelector('#connections-num').innerHTML = data.current_number;
-                }
-                else if (data.type === "stats_update") {
-                    let inner = '<table>';
+                } else if (data.type === "stats_update") {
+                    let innerScores = '<table class="table table-bordered"><tr><th>Player</th><th>Score</th><th>Round</th></tr>';
                     for (let i = 0; i < data.scores.length; ++i) {
-                        inner += '<tr><td>';
-                        inner += `${data.scores[i]["name"]} </td> <td> ${data.scores[i]["score"]}`;
-                        inner += '</td></tr>';
+                        innerScores += '<tr><td>';
+                        innerScores += `${data.scores[i]["name"]} </td> <td> ${data.scores[i]["score"]} </td><td> ${data.scores[i]["round"]}`;
+                        innerScores += '</td></tr>';
                     }
-                    inner += '</table><div id="card-set">';
+                    innerScores += '</table>';
+                    document.querySelector('#stats-scores').innerHTML = innerScores;
+                    document.querySelector('#cards-left').innerHTML = `<h5>Cards left: ${data.stack}</h5>`;
+                    let inner = '<div id="card-set">';
                     for (let i = 0; i < data.card_set.length; ++i) {
-                        inner += `<div class="card align-top d-inline-block"><img height="200" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"`;
+                        let classVal = "";
+                        if (data.card_set[i].host) {
+                            classVal = ' class="story-card"';
+                        }
+                        inner += `<div class="card align-top d-inline-block"><img height="200" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"${classVal}`;
                         inner += '<p>';
                         for (let j = 0; j < data.card_set[i].users.length; ++j) {
                             inner += `${data.card_set[i].users[j]} `;
@@ -131,7 +130,6 @@
                         inner += "</p></div>";
                     }
                     inner += '</div>';
-                    console.log(inner);
                     document.querySelector('#stats-card-set').innerHTML = inner;
                 }
                 else if (data.type === "state_update") {
@@ -144,7 +142,7 @@
                     }
                     else if (data.state == "choice") {
                         document.querySelector('#choice-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
-                        if (data.is_observer || data.is_host) {
+                        if (data.is_observer || data.is_host || data.action_required == false) {
                             document.querySelector('#choice-wait').className = 'd-block';
                             document.querySelector('#choice-do').className = 'd-none';
                         }
@@ -156,7 +154,7 @@
                     }
                     else if (data.state == "vote") {
                         document.querySelector('#vote-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
-                        if (data.is_observer || data.is_host) {
+                        if (data.is_observer || data.is_host || data.action_required == false) {
                             document.querySelector('#vote-wait').className = 'd-block';
                             document.querySelector('#vote-do').className = 'd-none';
                         }
@@ -173,23 +171,22 @@
                         }
                         else {
                             document.querySelector('#story-write').className = 'd-none';
+                            document.querySelector('#story-wait').innerHTML = `<h4>Waiting for ${data.story} to pick a card</h4>`;
                             document.querySelector('#story-wait').className = 'd-block';
                         }
                         document.querySelector('#story').className = 'd-block';
                     }
-                    let i = 0;
-                    while (i < data.card_set.length) {
+                    let inner = "";
+                    for (let i = 0; i < data.card_set.length; ++i) {
                         let classVal = ` onclick="setChoice(${i})"`;
                         if (data.card_set[i]["my"] && data.state == "vote") {
                             classVal = ' class="my-card"';
                         }
-                        document.querySelector(`#card-${i + 1}`).innerHTML = (`<img height="200" id="${data.card_set[i]["id"]}" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"${classVal}>`);
-                        ++i;
+                        inner += `<div id="card-${i+1}" class="align-top d-inline-block">`;
+                        inner += (`<img height="200" id="${data.card_set[i]["id"]}" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"${classVal}>`);
+                        inner += '</div>';
                     }
-                    while (i < 6) {
-                        document.querySelector(`#card-${i+1}`).innerHTML = ('');
-                        ++i;
-                    }
+                    document.querySelector('#card-set').innerHTML = inner;
                 }
             };
 
