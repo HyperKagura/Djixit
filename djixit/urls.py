@@ -17,6 +17,10 @@ from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView, PasswordChangeView
 from django.urls import include, path, re_path
 from .views import HomeView
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+#import .settings
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('dixit/', include('dixit.urls')),
@@ -27,3 +31,6 @@ urlpatterns = [
 
     re_path(r'^$', HomeView.as_view())
 ]
+
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += staticfiles_urlpatterns()

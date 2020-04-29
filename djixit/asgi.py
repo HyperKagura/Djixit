@@ -8,9 +8,21 @@ https://docs.djangoproject.com/en/3.0/howto/deployment/asgi/
 """
 
 import os
+from .settings import PRODUCTION
 
-from django.core.asgi import get_asgi_application
+if PRODUCTION:
+    import django
+    from channels.routing import get_default_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'djixit.settings')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'djixit.settings')
 
-application = get_asgi_application()
+    django.setup()
+
+    application = get_default_application()
+else:
+    from django.core.asgi import get_asgi_application
+
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'djixit.settings')
+
+    application = get_asgi_application()
+

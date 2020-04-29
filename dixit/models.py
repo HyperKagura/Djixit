@@ -7,7 +7,7 @@ import random
 
 # Create your models here.
 
-ROOM_CONNECTIONS_LIMIT = 2
+ROOM_CONNECTIONS_LIMIT = 12
 
 ROOM_GAME_STATE_WAITING_PLAYERS = 0
 ROOM_GAME_STATE_HOST_PICKS_CARD = 1
@@ -18,13 +18,13 @@ ROOM_GAME_STATE_VOTING = 3
 
 class Room(models.Model):
     name = models.CharField(max_length=200)
-    start_date = models.DateTimeField('date started')
+    start_date = models.DateTimeField('date started', auto_now_add=True)
     connections_number = models.IntegerField(default=0)
     game_state = models.IntegerField(default=0, null=False)
     prev_game_state = models.IntegerField(default=0, editable=False, null=False)
     num_people_action_needed = models.IntegerField(default=0, null=False)
     is_full = models.BooleanField(default=False, null=False)
-    story = models.CharField(max_length=255)
+    story = models.CharField(max_length=255, )
 
     def __init__(self, *args, **kwargs):
         super(Room, self).__init__(*args, **kwargs)

@@ -125,7 +125,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'from_user': from_field,
         }))
 
-    async def send_state_to_user(self, state, is_host, card_set, story="", is_observer=False):
+    async def send_state_to_user(self, state, is_host, card_set, story="", is_observer=False, action_required=False):
         random.shuffle(card_set)
         await self.send(text_data=json.dumps({
             'type': 'state_update',
@@ -133,7 +133,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'is_host': is_host,
             'is_observer': is_observer,
             'card_set': card_set,
-            'story': story
+            'story': story,
+            'action_required': action_required
         }))
 
     async def send_stats_to_user(self, scores, card_set):
@@ -207,7 +208,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 else:
                     print("non-host")
                     await self.send_msg_to_user("vote for the card", "game")
-                    await self.send_state_to_user("vote", False, card_set, self.room.story)
+                    await self.send_state_to_user("vote", False, card_set, self.room.story, action_required=self.user_in_room.action_required)
         elif game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
             print("ROOM_GAME_STATE_OTHER_PICK_CARD")
             self.room = await sync_to_async(Room.objects.get)(id=self.room_name)
@@ -225,7 +226,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 else:
                     print("non-host")
                     await self.send_msg_to_user("choose a card", "game")
-                    await self.send_state_to_user("choice", False, card_set, self.room.story)
+                    await self.send_state_to_user("choice", False, card_set, self.room.story, action_required=self.user_in_room.action_required)
         elif game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
             await self.send_state_to_user("wait", False, [], True)
             await self.send_msg_to_user("waiting for players", "game")
