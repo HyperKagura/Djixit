@@ -68,4 +68,4 @@ Now let's run our Django site. Do:
 python manage.py runserver
 ```
 
-and open your Browser at http://127.0.0.1:8000/ . Hope it worked for you. Now, let's try to log-in as admin. visit http://127.0.0.1:8000/admin/ and enter your credentials.
+and open your Browser at http://127.0.0.1:8000/ . Hope it worked for you. Now, let's try to log-in as admin. Visit http://127.0.0.1:8000/admin/ and enter your credentials.

@@ -9,7 +9,7 @@ brew install postgresql
 start a Postgresql server:
 
 ```shell script
-brew services start postgresq
+brew services start postgresql
 ```
 
 try logging in:
