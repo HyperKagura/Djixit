@@ -1,3 +1,11 @@
+#Project Setup
+
+Apart from django you will need to install some python packages. Run:
+
+```shell script
+pip install channels channels_redis
+```
+
 to use django channels with redis locally run
 
 ```shell script

@@ -12,10 +12,10 @@ Install [Homebrew](https://brew.sh/) if it isn't already available
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)" 
 ```
 
-Install pyenv
+Install pyenv and pyenv-virtualenv. The last one is used to create virtual environment for your project
 
 ```shell script
-brew install pyenv 
+brew install pyenv pyenv-virtualenv
 ```
 
 Add pyenv initializer to shell startup script
@@ -66,12 +66,13 @@ python --version.
 
 #### Set Local Python
 
-To set a Python version for a specific project, cd into your project and then run:
+To set a Python environment for a specific project, cd into your project and then run:
 
 ```shell script
-pyenv local <python-version>
+pyenv virtualenv <python-version> <env-name>
+pyenv local <env-name>
 ```
 
-That will create a .python-version file in the current directory which pyenv will see and use to set the appropriate version.
+That will create a .python-version file in the current directory which pyenv will see and use to set the appropriate environment with packages.
 
 Small advice for beginners: my favorite python IDE is PyCharm. Check this out if you don't have preferences yet.

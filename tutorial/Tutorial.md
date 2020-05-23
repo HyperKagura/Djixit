@@ -17,3 +17,7 @@ Table of contents:
 **InstallDjango.md** - *Install Django framework and create your project and admin user*
 
 **ProjectSetup.md** - *Install channels and configure project*
+
+**ConfiguringProd.md** - *Set up server, configure nginx, gunicorn and daphne*
+
+**AddingNewGame.md** - *Add a new game you miss in this repo*

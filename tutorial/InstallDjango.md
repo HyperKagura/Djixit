@@ -6,6 +6,8 @@ Installation itself is pretty simple. Run:
 pip install django
 ```
 
+NB! Before you continue make sure to Install Postgres! check out InstallPostgres.md tutorial.
+
 To use Postgres from Django you will need to install popular python postgres package psycopg2:
 
 ```shell script
@@ -24,13 +26,13 @@ export CPPFLAGS="-I/usr/local/opt/openssl/include"
 
 and re-tried installing psycopg. Not sure if you should add those exports to zsh profile. (No kidding with openssl - this is a package for your security!)
 
-Now let's create a directory for your project:
+This repo already has base structure that was created with the following command. You *don't* need to run it.
 
 ```shell script
 django-admin.py startproject myproject .
 ```
 
-This command will create a "startproject" with all the files you need.
+This command creates a "startproject" with all the files you need.
 
 At this point you might also want to add git tracking to your project. Do it via console or your favorite IDE.
 
