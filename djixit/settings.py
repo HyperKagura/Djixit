@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'dixit.apps.DixitConfig',
+    'cah.apps.CahConfig',
     'channels',
 ]
 

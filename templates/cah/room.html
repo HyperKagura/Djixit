@@ -6,13 +6,13 @@
             <!-- Sidebar -->
             <div id="sidebar" class="bg-light">
                 {% if not user_in_room %}
-                    <a href="/dixit/{{ object.id }}/join" class="button">Join</a>
+                    <a href="/cah/{{ object.id }}/join" class="button">Join</a>
                 {% else %}
-                    <a href="/dixit/{{ object.id }}/leave" class="button">Leave</a>
+                    <a href="/cah/{{ object.id }}/leave" class="button">Leave</a>
                     {% if object.waiting_players %}
-                        <a href="/dixit/{{ object.id }}/start" class="button">Start</a>
+                        <a href="/cah/{{ object.id }}/start" class="button">Start</a>
                     {% else %}
-                        <a href="/dixit/{{ object.id }}/stop" class="button">Stop</a>
+                        <a href="/cah/{{ object.id }}/stop" class="button">Stop</a>
                     {% endif %}
                 {% endif %}
                 <div class="row">
@@ -84,7 +84,7 @@
 
         <script>
             function showBigCard(i) {
-                $("#cardBig").html('<img width="100%" src="/static/img/dixit/' + i + '">');
+                $("#cardBig").html('<img width="100%" src="/static/img/cah/' + i + '">');
                 $("#cardBig").show();
             }
 
@@ -98,7 +98,7 @@
             const chatSocket = new WebSocket(
                 'ws://'
                 + window.location.host
-                + '/ws/dixit/chat/'
+                + '/ws/cah/chat/'
                 + {{ object.id }}
                 + '/'
             );
@@ -116,7 +116,6 @@
                     }
                     innerScores += '</table>';
                     document.querySelector('#stats-scores').innerHTML = innerScores;
-                    document.querySelector('#prev-story').innerHTML = `<h4>Previous story was: ${data.story}</h4>`;
                     document.querySelector('#cards-left').innerHTML = `<h5>Cards left: ${data.stack}</h5>`;
                     let inner = '<div id="card-set">';
                     for (let i = 0; i < data.card_set.length; ++i) {
@@ -124,7 +123,7 @@
                         if (data.card_set[i].host) {
                             classVal = ' class="story-card"';
                         }
-                        inner += `<div class="card align-top d-inline-block"><img height="200" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"${classVal}`;
+                        inner += `<div class="card align-top d-inline-block"><img height="200" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/cah/${data.card_set[i]["path"]}"${classVal}`;
                         inner += '<p>';
                         for (let j = 0; j < data.card_set[i].users.length; ++j) {
                             inner += `${data.card_set[i].users[j]} `;
@@ -135,7 +134,6 @@
                     document.querySelector('#stats-card-set').innerHTML = inner;
                 }
                 else if (data.type === "state_update") {
-                    document.querySelector('#story').className = 'd-none';
                     document.querySelector('#vote').className = 'd-none';
                     document.querySelector('#wait').className = 'd-none';
                     document.querySelector('#choice').className = 'd-none';
@@ -185,7 +183,7 @@
                             classVal = ' class="my-card"';
                         }
                         inner += `<div id="card-${i+1}" class="align-top d-inline-block">`;
-                        inner += (`<img height="200" id="${data.card_set[i]["id"]}" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/dixit/${data.card_set[i]["path"]}"${classVal}>`);
+                        inner += (`<img height="200" id="${data.card_set[i]["id"]}" onmouseover="showBigCard('${data.card_set[i]["path"]}')" src="/static/img/cah/${data.card_set[i]["path"]}"${classVal}>`);
                         inner += '</div>';
                     }
                     document.querySelector('#card-set').innerHTML = inner;

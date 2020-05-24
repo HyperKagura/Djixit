@@ -24,6 +24,7 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('dixit/', include('dixit.urls')),
+    path('cah/', include('cah.urls')),
     path('admin/', admin.site.urls),
     re_path(r'^login/$', LoginView.as_view()),
     re_path(r'^logout/$', LogoutView.as_view()),

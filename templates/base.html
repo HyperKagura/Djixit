@@ -30,6 +30,7 @@
                 <ul class="navbar-nav mr-auto">
                     {% if request.user.is_authenticated %}
                         <li><a href="/dixit/" class="nav-link">Dixit</a></li>
+                        <li><a href="/cah/" class="nav-link">C.A.H.</a></li>
                         <li><a href="/logout/?next=/" class="nav-link">Logout</a></li>
                     {% else %}
                         <li><a href="/login/">Login</a></li>
