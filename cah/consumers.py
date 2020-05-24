@@ -61,8 +61,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         text_data_json = json.loads(text_data)
         if text_data_json['type'] == 'game-event':
+            question = None
             try:
                 self.user_in_room = await sync_to_async(CahUsersInRoom.objects.get)(room=self.room, user=self.user)
+                question_card = await sync_to_async(CahCardGame.objects.filter)(room=self.room,
+                                                                                card__card_type=CARD_TYPE_QUESTION,
+                                                                                card_state=CARD_STATE_VOTE)
+                question = await sync_to_async(lambda card_filter: card_filter[0].card.path())(question_card)
             except CahUsersInRoom.DoesNotExist as e:
                 self.user_in_room = None
                 return
@@ -78,20 +83,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         in
                         card_query])(card_query)
                     await self.send_msg_to_user("waiting for other players to choose a card", "game")
-                    await self.send_state_to_user("choice", False, card_set, self.room.story,
+                    await self.send_state_to_user("choice", False, card_set, question,
                                                       action_required=False)
             elif text_data_json['game-event'] == 'vote':
                 if self.user_in_room.is_host and self.user_in_room.action_required:
                     print("vote card_id is: {}".format(text_data_json['choice']))
                     await sync_to_async(self.set_vote_card)(int(text_data_json['choice']))
                     card_query = await sync_to_async(CahCardGame.objects.filter)(room=self.room,
-                                                                              card_state=CARD_STATE_VOTE)
+                                                                              card_state=CARD_STATE_VOTE,
+                                                                                 card__card_type=CARD_TYPE_ANSWER)
                     card_set = await sync_to_async(
                             lambda card_query: [
                                 {"id": card.id, "path": card.card.path(), "my": card.user.id == self.user_in_room.id}
                                 for card in card_query])(card_query)
                     await self.send_msg_to_user("waiting for other players to vote", "game")
-                    await self.send_state_to_user("vote", False, card_set, self.room.story,
+                    await self.send_state_to_user("vote", False, card_set, question,
                                                           action_required=False)
         elif text_data_json['type'] == 'message':
             message = text_data_json['message']
@@ -136,14 +142,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'from_user': from_field,
         }))
 
-    async def send_state_to_user(self, state, is_host, card_set, story="", is_observer=False, action_required=False):
+    async def send_state_to_user(self, state, is_host, card_set, question, is_observer=False, action_required=False):
         await self.send(text_data=json.dumps({
             'type': 'state_update',
             'state': state,
             'is_host': is_host,
             'is_observer': is_observer,
             'card_set': card_set,
-            'story': story,
+            'question': question,
             'action_required': action_required
         }))
 
@@ -161,22 +167,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             print("ROOM_GAME_STATE_OTHER_PICK_CARD")
             await self.build_choice_message()
         elif game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
-            await self.send_state_to_user("wait", False, [], True)
+            await self.send_state_to_user("wait", False, [], None)
             await self.send_msg_to_user("waiting for players", "game")
-
-    def set_story_card(self, story, card_id):
-        #try:
-            card = CahCardGame.objects.get(id=card_id, user=self.user_in_room)
-            card.card_state = CARD_STATE_VOTE
-            card.hosts_card = True
-            card.save()
-            self.user_in_room.action_required = False
-            self.user_in_room.save()
-            self.room.story = story
-            self.room.game_state = ROOM_GAME_STATE_OTHER_PICK_CARD
-            self.room.save()
-        #except Exception as e:
-        #    print(e)
 
     def set_choice_card(self, card_id):
         try:
@@ -204,14 +196,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return str(CahUsersInRoom.objects.filter(room=self.room, is_host=True)[0].user)
         except Exception as e:
             print(e)
-            return "storyteller"
+            return "Guru"
 
     def get_card_votes(self):
         cards = CahCardGame.objects.filter(room=self.room, card_state=CARD_STATE_VOTE_PREV)
         return [{"id": card.id, "path": card.card.path(), "host": card.hosts_card, "users": [str(vote.user.user) for vote in CahCardVotes.objects.filter(card=card)]} for card in cards]
 
     async def build_voting_message(self):
-        card_query = await sync_to_async(CahCardGame.objects.filter)(room=self.room, card_state=CARD_STATE_VOTE)
+        card_query = await sync_to_async(CahCardGame.objects.filter)(room=self.room, card_state=CARD_STATE_VOTE, card__card_type=CARD_TYPE_ANSWER)
+        question_card = await sync_to_async(CahCardGame.objects.filter)(room=self.room,
+                                                                        card__card_type=CARD_TYPE_QUESTION,
+                                                                        card_state=CARD_STATE_VOTE)
+        question = await sync_to_async(lambda card_filter: card_filter[0].card.path())(question_card)
         if not self.user_in_room:
             card_set = await sync_to_async(
                 lambda card_query: [{"id": card.id, "path": card.card.path(), "my": False}
@@ -219,7 +215,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             random.shuffle(card_set)
             print("anonim")
             await self.send_msg_to_user("waiting for other players to vote", "game")
-            await self.send_state_to_user("vote", False, card_set, self.room.story, True)
+            await self.send_state_to_user("vote", False, card_set, question, True)
         else:
             card_set = await sync_to_async(
                 lambda card_query: [
@@ -228,34 +224,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
             random.shuffle(card_set)
             if self.user_in_room.is_host:
                 print("host")
-                await self.send_msg_to_user("waiting for other players to vote", "game")
-                await self.send_state_to_user("vote", True, card_set, self.room.story)
+                await self.send_msg_to_user("vote for the card", "game")
+                await self.send_state_to_user("vote", True, card_set, question,
+                                              action_required=self.user_in_room.action_required)
             else:
                 print("non-host")
-                await self.send_msg_to_user("vote for the card", "game")
-                await self.send_state_to_user("vote", False, card_set, self.room.story,
-                                              action_required=self.user_in_room.action_required)
+                await self.send_msg_to_user("waiting for host to vote", "game")
+                await self.send_state_to_user("vote", False, card_set, question)
 
     async def build_choice_message(self):
+        question_card = await sync_to_async(CahCardGame.objects.filter)(room=self.room,
+                                                                        card__card_type=CARD_TYPE_QUESTION,
+                                                                        card_state=CARD_STATE_VOTE)
+        question = await sync_to_async(lambda card_filter: card_filter[0].card.path())(question_card)
         self.room = await sync_to_async(CahRoom.objects.get)(id=self.room_name)
         if not self.user_in_room:
             print("anonim")
             await self.send_msg_to_user("waiting for other players to choose a card", "game")
-            await self.send_state_to_user("choice", False, [], self.room.story, True)
+            await self.send_state_to_user("choice", False, [], question, True)
         else:
-            card_query = await sync_to_async(CahCardGame.objects.filter)(room=self.room, user=self.user_in_room,
+            card_query = await sync_to_async(CahCardGame.objects.filter)(room=self.room, user=self.user_in_room, card__card_type=CARD_TYPE_ANSWER,
                                                                       card_state=CARD_STATE_IN_GAME)
             card_set = await sync_to_async(lambda card_query: [
                 {"id": card.id, "path": card.card.path(), "my": card.user.id == self.user_in_room.id} for card in
                 card_query])(card_query)
+            print("question is", question)
             if (self.user_in_room is None) or self.user_in_room.is_host:
                 print("anonim or host")
                 await self.send_msg_to_user("waiting for other players to choose a card", "game")
-                await self.send_state_to_user("choice", True, card_set, self.room.story)
+                await self.send_state_to_user("choice", True, card_set, question)
             else:
                 print("non-host")
                 await self.send_msg_to_user("choose a card", "game")
-                await self.send_state_to_user("choice", False, card_set, self.room.story,
+                await self.send_state_to_user("choice", False, card_set, question,
                                               action_required=self.user_in_room.action_required)
 
     async def build_stats_message(self):

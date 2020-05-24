@@ -33,15 +33,6 @@
                 <!-- We'll fill this with dummy content -->
                  <h3>Welcome to {{ object.name }}!</h3>
                 <div id="game-content">
-                    <div id="story" class="d-none">
-                        <div id="story-write">
-                            <h4>Create a story</h4>
-                            <input id="story-input" class="form-control" type="text" size="100">
-                            <input id="story-submit" type="button" class="btn" value="Send">
-                        </div>
-                        <div id="story-wait">
-                        </div>
-                    </div>
                     <div id="choice" class="d-none">
                         <div id="choice-story"></div>
                         <div id="choice-wait">
@@ -57,10 +48,10 @@
                         <div id="vote-story">
                         </div>
                         <div id="vote-wait">
-                            <h4>Waiting for other players to vote</h4>
+                            <h4>Waiting for host to vote</h4>
                         </div>
                         <div id="vote-do">
-                            <h4>Vote for storyteller's card</h4>
+                            <h4>Read answers and vote for the best one</h4>
                             <input id="vote-submit" type="button" class="btn" value="Send">
                         </div>
                     </div>
@@ -89,7 +80,7 @@
             }
 
             function setChoice(j) {
-                for (let i = 0; i < 6; ++i) {
+                for (let i = 0; i < 10; ++i) {
                     $(`#card-${i+1}`).removeClass("my-choice");
                 }
                 $(`#card-${j+1}`).addClass("my-choice");
@@ -141,7 +132,7 @@
                          document.querySelector('#wait').className = 'd-block';
                     }
                     else if (data.state == "choice") {
-                        document.querySelector('#choice-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
+                        document.querySelector('#choice-story').innerHTML = `<h4>Question is:</h4><div class="card align-top d-inline-block"><img height="200" onmouseover="showBigCard('${data.question}')" src="/static/img/cah/${data.question}"></div>`;
                         if (data.is_observer || data.is_host || data.action_required == false) {
                             document.querySelector('#choice-wait').className = 'd-block';
                             document.querySelector('#choice-do').className = 'd-none';
@@ -153,8 +144,8 @@
                         document.querySelector('#choice').className = 'd-block';
                     }
                     else if (data.state == "vote") {
-                        document.querySelector('#vote-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
-                        if (data.is_observer || data.is_host || data.action_required == false) {
+                        document.querySelector('#vote-story').innerHTML = `<h4>Question is:</h4><div class="card align-top d-inline-block"><img height="200" onmouseover="showBigCard('${data.question}')" src="/static/img/cah/${data.question}"></div>`;
+                        if (data.is_observer || !data.is_host || data.action_required == false) {
                             document.querySelector('#vote-wait').className = 'd-block';
                             document.querySelector('#vote-do').className = 'd-none';
                         }
@@ -163,18 +154,6 @@
                             document.querySelector('#vote-do').className = 'd-block';
                         }
                         document.querySelector('#vote').className = 'd-block';
-                    }
-                    else if (data.state == "story") {
-                        if (data.is_host) {
-                            document.querySelector('#story-write').className = 'd-block';
-                            document.querySelector('#story-wait').className = 'd-none';
-                        }
-                        else {
-                            document.querySelector('#story-write').className = 'd-none';
-                            document.querySelector('#story-wait').innerHTML = `<h4>Waiting for ${data.story} to pick a card</h4>`;
-                            document.querySelector('#story-wait').className = 'd-block';
-                        }
-                        document.querySelector('#story').className = 'd-block';
                     }
                     let inner = "";
                     for (let i = 0; i < data.card_set.length; ++i) {
@@ -212,33 +191,6 @@
                         'message': message
                     }));
                     messageInputDom.value = '';
-                }
-            };
-
-            document.querySelector('#story-input').onkeyup = function(e) {
-                if (e.keyCode === 13) {  // enter, return
-                    document.querySelector('#story-submit').click();
-                }
-            };
-
-            document.querySelector('#story-submit').onclick = function(e) {
-                const storyInputDom = document.querySelector('#story-input');
-                const story = storyInputDom.value;
-                const storyChoiceDom = document.querySelector('.my-choice');
-                if (story.length <= 0) {
-                    $( "#story-input" ).effect("shake", {distance: 5});
-                } else if (!storyChoiceDom) {
-                    $( "#card-set" ).effect("shake", {distance: 5});
-                } else {
-                    const card = storyChoiceDom.getElementsByTagName("img")[0];
-                    chatSocket.send(JSON.stringify({
-                        'type': 'game-event',
-                        'game-event': 'story',
-                        'story': story,
-                        'choice': card.id
-                    }));
-                    storyInputDom.value = '';
-                    $( ".my-choice" ).removeClass("my-choice");
                 }
             };
 

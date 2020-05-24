@@ -88,7 +88,6 @@ class CahUsersInRoom(models.Model):
     def set_host(self):
         CahUsersInRoom.objects.filter(room=self.room).update(is_host=False)
         self.is_host = True
-        self.action_required = True
         self.save()
 
     def set_next_host(self):
@@ -138,14 +137,14 @@ class CahCard(models.Model):
     num_fields = models.IntegerField(default=1, null=False)
 
     class Meta:
-        unique_together = ["set", "name"]
+        unique_together = ["set", "name", "card_type"]
 
     def __str__(self):
         return "card" + self.name
 
     def path(self):
-        sup_path = "black/" if self.card_type == CARD_TYPE_QUESTION else "white/"
-        return self.set.name + "/card" + self.name + ".png"
+        sub_path = "/black" if self.card_type == CARD_TYPE_QUESTION else "/white"
+        return self.set.name + sub_path + "/card" + self.name + ".jpg"
 
 
 CARD_STATE_WAITING = 0
@@ -256,7 +255,10 @@ def on_game_state_update(instance, created, raw, **kwargs):
             print("models ROOM_GAME_STATE_HOST_PICKS_CARD")
             answer_cards = list(CahCardGame.objects.filter(room=instance, card__card_type=CARD_TYPE_ANSWER,
                                                         card_state=CARD_STATE_WAITING))
+            question_cards = list(CahCardGame.objects.filter(room=instance, card__card_type=CARD_TYPE_QUESTION,
+                                                           card_state=CARD_STATE_WAITING))
             random.shuffle(answer_cards)
+            random.shuffle(question_cards)
             users_in_room = CahUsersInRoom.objects.filter(room=instance)
             users_num = users_in_room.count()
             if instance.prev_game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
@@ -268,25 +270,34 @@ def on_game_state_update(instance, created, raw, **kwargs):
             else:
                 print("next round")
                 old_host = CahUsersInRoom.objects.get(room=instance, is_host=True)
-                #TODO: update score count
-                #user.score += 1
-                #user.round_score += 1
-                #user.save()
+                last_votes = CahCardVotes.objects.filter(room=instance, card__card_state=CARD_STATE_VOTE)
+                CahUsersInRoom.objects.filter(room=instance).update(round_score=0)
+                if len(last_votes):
+                    user = last_votes[0].user
+                    user.score += 1
+                    user.round_score = 1
+                    user.save()
+                else:
+                    print("no votes found")
                 old_host.set_next_host()
                 for i, user in enumerate(users_in_room):
                     for card in answer_cards[i:users_num:users_num]: #TODO: add 2 cards of question card required 2 cards
                         CahCardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
                 CahCardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE_PREV).update(card_state=CARD_STATE_PLAYED)
                 CahCardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE).update(card_state=CARD_STATE_VOTE_PREV)
+            # select new question
+            if len(question_cards) > 0:
+                print("question card set to", question_cards[0].card.path())
+                CahCardGame.objects.filter(id=question_cards[0].id).update(card_state=CARD_STATE_VOTE)
             print("models ROOM_GAME_STATE_OTHER_PICK_CARD")
             CahUsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
         elif instance.game_state == ROOM_GAME_STATE_VOTING:
             print("models ROOM_GAME_STATE_VOTING")
-            CahUsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True, prev_action_required=True)
+            CahUsersInRoom.objects.filter(room=instance, is_host=True).update(action_required=True, prev_action_required=True)
             print("voting set actions true")
         elif instance.game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
             CahCardGame.objects.filter(room=instance).update(card_state=CARD_STATE_WAITING, user=None)
-            CahUsersInRoom.objects.filter(room=instance).update(is_host=False, score=0, action_required=False)
+            CahUsersInRoom.objects.filter(room=instance).update(is_host=False, score=0, action_required=False, prev_action_required=False)
             CahCardVotes.objects.filter(room=instance).delete()
         instance.prev_game_state = instance.game_state
         instance.save()
@@ -295,5 +306,11 @@ def on_game_state_update(instance, created, raw, **kwargs):
             {
                 'type': 'game_state_changed',
                 'game_state': instance.game_state,
+            }
+        )
+        async_to_sync(get_channel_layer().group_send)(
+            "chat_" + str(instance.id),
+            {
+                'type': 'game_stats_changed',
             }
         )
