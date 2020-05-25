@@ -6,14 +6,16 @@
             <!-- Sidebar -->
             <div id="sidebar" class="bg-light">
                 {% if not user_in_room %}
-                    <a href="/dixit/{{ object.id }}/join" class="button">Join</a>
+                    <a href="/dixit/{{ object.id }}/join" class="btn btn-outline-dark">Join</a>
                 {% else %}
-                    <a href="/dixit/{{ object.id }}/leave" class="button">Leave</a>
+                    <div class="d-inline-block"><a href="/dixit/{{ object.id }}/leave" class="btn btn-outline-dark">Leave</a></div>
+                    <div id="start-stop" class="d-inline-block">
                     {% if object.waiting_players %}
-                        <a href="/dixit/{{ object.id }}/start" class="button">Start</a>
+                        <a href="/dixit/{{ object.id }}/start" class="btn btn-outline-dark">Start</a>
                     {% else %}
-                        <a href="/dixit/{{ object.id }}/stop" class="button">Stop</a>
+                        <a href="/dixit/{{ object.id }}/stop" class="btn btn-outline-dark">Stop</a>
                     {% endif %}
+                    </div>
                 {% endif %}
                 <div class="row">
                     <div class="col-lg-12">
@@ -22,7 +24,7 @@
                         <div id="chat-log" class="pre-scrollable panel container-fluid bg-white"></div><br>
                         {% if user_in_room %}
                             <input id="chat-message-input" class="form-control" type="text" size="100"><br>
-                            <input id="chat-message-submit" type="button" class="btn" value="Send">
+                            <input id="chat-message-submit" type="button" class="btn btn-outline-dark" value="Send">
                         {% endif %}
                     </div>
                 </div>
@@ -37,7 +39,7 @@
                         <div id="story-write">
                             <h4>Create a story</h4>
                             <input id="story-input" class="form-control" type="text" size="100">
-                            <input id="story-submit" type="button" class="btn" value="Send">
+                            <input id="story-submit" type="button" class="btn btn-outline-dark mt-2" value="Send">
                         </div>
                         <div id="story-wait">
                         </div>
@@ -50,7 +52,7 @@
                         </div>
                         <div id="choice-do">
                             <h4>Choose a card to suit the story</h4>
-                            <input id="choice-submit" type="button" class="btn" value="Send">
+                            <input id="choice-submit" type="button" class="btn btn-outline-dark" value="Send">
                         </div>
                     </div>
                     <div id="vote" class="d-none">
@@ -61,7 +63,7 @@
                         </div>
                         <div id="vote-do">
                             <h4>Vote for storyteller's card</h4>
-                            <input id="vote-submit" type="button" class="btn" value="Send">
+                            <input id="vote-submit" type="button" class="btn btn-outline-dark" value="Send">
                         </div>
                     </div>
                     <div id="wait" class="d-none">
@@ -141,42 +143,46 @@
                     document.querySelector('#choice').className = 'd-none';
                     if (data.state == "wait") {
                          document.querySelector('#wait').className = 'd-block';
+                         document.querySelector('#start-stop').innerHTML = '<a href="/dixit/{{ object.id }}/start" class="btn btn-outline-dark">Start</a>';
                     }
-                    else if (data.state == "choice") {
-                        document.querySelector('#choice-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
-                        if (data.is_observer || data.is_host || data.action_required == false) {
-                            document.querySelector('#choice-wait').className = 'd-block';
-                            document.querySelector('#choice-do').className = 'd-none';
+                    else {
+                        document.querySelector('#start-stop').innerHTML = '<a href="/dixit/{{ object.id }}/stop" class="btn btn-outline-dark">Stop</a>';
+                        if (data.state == "choice") {
+                            document.querySelector('#choice-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
+                            if (data.is_observer || data.is_host || data.action_required == false) {
+                                document.querySelector('#choice-wait').className = 'd-block';
+                                document.querySelector('#choice-do').className = 'd-none';
+                            }
+                            else {
+                                document.querySelector('#choice-wait').className = 'd-none';
+                                document.querySelector('#choice-do').className = 'd-block';
+                            }
+                            document.querySelector('#choice').className = 'd-block';
                         }
-                        else {
-                            document.querySelector('#choice-wait').className = 'd-none';
-                            document.querySelector('#choice-do').className = 'd-block';
+                        else if (data.state == "vote") {
+                            document.querySelector('#vote-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
+                            if (data.is_observer || data.is_host || data.action_required == false) {
+                                document.querySelector('#vote-wait').className = 'd-block';
+                                document.querySelector('#vote-do').className = 'd-none';
+                            }
+                            else {
+                                document.querySelector('#vote-wait').className = 'd-none';
+                                document.querySelector('#vote-do').className = 'd-block';
+                            }
+                            document.querySelector('#vote').className = 'd-block';
                         }
-                        document.querySelector('#choice').className = 'd-block';
-                    }
-                    else if (data.state == "vote") {
-                        document.querySelector('#vote-story').innerHTML = `<h4>Story is: ${data.story}</h4>`;
-                        if (data.is_observer || data.is_host || data.action_required == false) {
-                            document.querySelector('#vote-wait').className = 'd-block';
-                            document.querySelector('#vote-do').className = 'd-none';
+                        else if (data.state == "story") {
+                            if (data.is_host) {
+                                document.querySelector('#story-write').className = 'd-block';
+                                document.querySelector('#story-wait').className = 'd-none';
+                            }
+                            else {
+                                document.querySelector('#story-write').className = 'd-none';
+                                document.querySelector('#story-wait').innerHTML = `<h4>Waiting for ${data.story} to pick a card</h4>`;
+                                document.querySelector('#story-wait').className = 'd-block';
+                            }
+                            document.querySelector('#story').className = 'd-block';
                         }
-                        else {
-                            document.querySelector('#vote-wait').className = 'd-none';
-                            document.querySelector('#vote-do').className = 'd-block';
-                        }
-                        document.querySelector('#vote').className = 'd-block';
-                    }
-                    else if (data.state == "story") {
-                        if (data.is_host) {
-                            document.querySelector('#story-write').className = 'd-block';
-                            document.querySelector('#story-wait').className = 'd-none';
-                        }
-                        else {
-                            document.querySelector('#story-write').className = 'd-none';
-                            document.querySelector('#story-wait').innerHTML = `<h4>Waiting for ${data.story} to pick a card</h4>`;
-                            document.querySelector('#story-wait').className = 'd-block';
-                        }
-                        document.querySelector('#story').className = 'd-block';
                     }
                     let inner = "";
                     for (let i = 0; i < data.card_set.length; ++i) {
