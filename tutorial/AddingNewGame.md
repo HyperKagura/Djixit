@@ -1,4 +1,4 @@
-#Adding New Game
+# Adding New Game
 
 ```shell script
 python manage.py startapp myGame

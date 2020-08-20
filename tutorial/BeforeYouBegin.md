@@ -1,6 +1,6 @@
 # Before You Begin
 
-##Installing Homebrew, pyenv and python.
+## Installing Homebrew, pyenv and python.
 
 Get Homebrew if you haven't already, configure your favorite venv and install python. I am using python 3.7.5 with pyenv.
 I used this [guide](https://medium.com/python-every-day/python-development-on-macos-with-pyenv-2509c694a808) 

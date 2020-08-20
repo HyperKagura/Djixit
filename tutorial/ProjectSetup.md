@@ -1,4 +1,4 @@
-#Project Setup
+# Project Setup
 
 Apart from django you will need to install some python packages. Run:
 
