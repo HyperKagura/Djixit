@@ -6,6 +6,7 @@ from .models import Room, UsersInRoom, CardGame, CardVotes
 from .models import ROOM_GAME_STATE_WAITING_PLAYERS, ROOM_GAME_STATE_HOST_PICKS_CARD, ROOM_GAME_STATE_OTHER_PICK_CARD, ROOM_GAME_STATE_VOTING
 from .models import CARD_STATE_VOTE, CARD_STATE_IN_GAME, CARD_STATE_VOTE_PREV, CARD_STATE_WAITING
 import random
+import html
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -97,7 +98,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     await self.send_state_to_user("vote", False, card_set, self.room.story,
                                                           action_required=False)
         elif text_data_json['type'] == 'message':
-            message = text_data_json['message']
+            message = html.escape(text_data_json['message'])
             try:
                 self.user_in_room = await sync_to_async(UsersInRoom.objects.get)(room=self.room, user=self.user)
             except UsersInRoom.DoesNotExist as e:
