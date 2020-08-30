@@ -69,7 +69,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if text_data_json['game-event'] == 'story':
                 if self.user_in_room.is_host and self.user_in_room.action_required:
                     print("story is {}, card_id is: {}".format(text_data_json['story'], text_data_json['choice']))
-                    await sync_to_async(self.set_story_card)(text_data_json['story'], int(text_data_json['choice']))
+                    await sync_to_async(self.set_story_card)(html.escape(text_data_json['story']), int(text_data_json['choice']))
             elif text_data_json['game-event'] == 'choice':
                 print("choice: ", text_data_json['choice'])
                 if not self.user_in_room.is_host and self.user_in_room.action_required:
