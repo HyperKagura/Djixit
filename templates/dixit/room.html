@@ -33,7 +33,8 @@
             <!-- Page Content -->
             <div id="content" class="content-main">
                 <!-- We'll fill this with dummy content -->
-                 <h3>Welcome to {{ object.name }}!</h3>
+                <h3>Welcome to {{ object.name }}!</h3>
+                <hr>
                 <div id="game-content">
                     <div id="story" class="d-none">
                         <div id="story-write">
@@ -67,7 +68,9 @@
                         </div>
                     </div>
                     <div id="wait" class="d-none">
-                        <h4>Waiting for game to start</h4>
+                        <div id="winners"></div>
+                        <h5>Waiting for game to start</h5>
+                        <hr>
                     </div>
                     <div id="card-set" class="container">
                     </div>
@@ -142,7 +145,16 @@
                     document.querySelector('#wait').className = 'd-none';
                     document.querySelector('#choice').className = 'd-none';
                     if (data.state == "wait") {
+                         if (data.winners.length === 1) {
+                             document.querySelector('#winners').innerHTML = `<h4>The Winner is: <span class="confetti">${data.winners[0]}</span>!</h4>`;
+                         } else if (data.winners.length > 1) {
+                             let winnersStr = '<h5>The Winners are: <span class="confetti">';
+                             winnersStr += data.winners.join(',');
+                             winnersStr += "</span>!</h5>";
+                             document.querySelector('#winners').innerHTML = winnersStr;
+                         }
                          document.querySelector('#wait').className = 'd-block';
+                         confetti();
                          document.querySelector('#start-stop').innerHTML = '<a href="/dixit/{{ object.id }}/start" class="btn btn-outline-dark">Start</a>';
                     }
                     else {

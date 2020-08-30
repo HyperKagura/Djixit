@@ -26,6 +26,7 @@ class Room(models.Model):
     prev_story = models.CharField(max_length=255, default="")
     max_players = models.IntegerField(default=7, null=False)
     games_count = models.IntegerField(default=0, null=False)
+    winner_score = models.IntegerField(default=-1, null=False)
 
     def __init__(self, *args, **kwargs):
         super(Room, self).__init__(*args, **kwargs)
@@ -66,9 +67,10 @@ class Room(models.Model):
         return user_in_room
 
     def start_game(self):
-        CardGame.objects.filter(room=self).update(card_state=CARD_STATE_WAITING, user=None)
-        UsersInRoom.objects.filter(room=self).update(is_host=False, score=0, action_required=False)
+        CardGame.objects.filter(room=self).update(card_state=CARD_STATE_WAITING, hosts_card=False, user=None)
+        UsersInRoom.objects.filter(room=self).update(is_host=False, score=0, round_score=0, action_required=False)
         CardVotes.objects.filter(room=self).delete()
+
         self.prev_story = ""
         self.game_state = ROOM_GAME_STATE_HOST_PICKS_CARD
         self.games_count += 1
@@ -76,6 +78,7 @@ class Room(models.Model):
 
     def stop_game(self):
         self.game_state = ROOM_GAME_STATE_WAITING_PLAYERS
+        self.winner_score = UsersInRoom.objects.filter(room=self).aggregate(models.Max("score"))['score__max']
         self.save()
 
     def full(self):
@@ -83,6 +86,9 @@ class Room(models.Model):
 
     def is_waiting(self):
         return self.game_state == ROOM_GAME_STATE_WAITING_PLAYERS
+
+    def get_winners(self):
+        return [str(user.user) for user in UsersInRoom.objects.filter(room=self, score=self.winner_score)]
 
 
 class GameCardStats(models.Model):
@@ -125,13 +131,9 @@ class UsersInRoom(models.Model):
         if self.is_host:
             next_hosts = UsersInRoom.objects.filter(room=self.room, id__gt=self.id).order_by("id")
             if len(next_hosts) == 0:  # set first user in room to be host
-                print("no hosts after")
                 next_hosts = UsersInRoom.objects.filter(room=self.room).order_by("id")
-                print(next_hosts)
                 if len(next_hosts) == 0:  # set first user in room to be host
-                    print("error: no users left in room")
                     return
-            print("next host is" + str(next_hosts[0]))
             next_hosts[0].set_host(next_host_action_required)
 
 
@@ -285,7 +287,6 @@ def change_user_count_post(instance, using, **kwargs):
 
 @receiver(models.signals.post_save, sender=UsersInRoom)
 def change_user_count(instance, using, **kwargs):
-    print(str(instance), " action:", instance.action_required, "old:", instance.prev_action_required)
     if instance.action_required != instance.prev_action_required:
         instance.prev_action_required = instance.action_required
         instance.save()
@@ -297,6 +298,8 @@ def change_user_count(instance, using, **kwargs):
         elif instance.room.game_state == ROOM_GAME_STATE_VOTING:
             num_awaiting = UsersInRoom.objects.filter(room=instance.room, action_required=True).count()
             if num_awaiting == 0:
+                if CardGame.objects.filter(room=instance.room, card_state=CARD_STATE_WAITING).count() < UsersInRoom.objects.filter(room=instance.room).count():
+                    return instance.room.stop_game()
                 instance.room.game_state = ROOM_GAME_STATE_HOST_PICKS_CARD
                 instance.room.save()
 
@@ -306,20 +309,17 @@ def on_game_state_update(instance, created, raw, **kwargs):
     if instance.game_state != instance.prev_game_state:
         if instance.game_state == ROOM_GAME_STATE_HOST_PICKS_CARD:
             instance.prev_story = instance.story
-            print("models ROOM_GAME_STATE_HOST_PICKS_CARD")
             cards = list(CardGame.objects.filter(room=instance, card_state=CARD_STATE_WAITING))
             random.shuffle(cards)
             users_in_room = UsersInRoom.objects.filter(room=instance)
             users_num = users_in_room.count()
             if instance.prev_game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
-                print("new game")
                 users_in_room[0].set_host()
                 for i, user in enumerate(users_in_room):
                     for card in cards[i:users_num * 6:users_num]:
                         CardGame.objects.filter(id=card.id).update(user=user, card_state=CARD_STATE_IN_GAME)
                 CardVotes.objects.filter(room=instance).delete()
             else:
-                print("next round")
                 old_host = UsersInRoom.objects.get(room=instance, is_host=True)
                 host_card = CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE, user=old_host)[0]
                 host_votes = CardVotes.objects.filter(room=instance, card=host_card)
@@ -336,12 +336,10 @@ def on_game_state_update(instance, created, raw, **kwargs):
                         else:
                             old_host.round_score = 0
                             old_host.save()
-                    print("story was:", instance.prev_story)
                     for card in CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE):
                         num_votes = 0
                         if card.hosts_card:
                             num_votes = host_votes.count()
-                        print("votes for card", card.card, ":", num_votes, "; is host:", card.hosts_card)
                         card_stat = GameCardStats(room_id=instance.id,
                                                   game_id=instance.games_count,
                                                   card_id=card.card.id,
@@ -368,10 +366,8 @@ def on_game_state_update(instance, created, raw, **kwargs):
                         vote.card.user.score += 1
                         vote.card.user.round_score += 1
                         vote.card.user.save()
-                    print("story was:", instance.prev_story)
                     for card in CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE):
                         num_votes = CardVotes.objects.filter(room=instance, card=card).count()
-                        print("votes for card", card.card, ":", num_votes, "; is host:", card.hosts_card)
                         card_stat = GameCardStats(room_id=instance.id,
                                                   game_id=instance.games_count,
                                                   card_id=card.card.id,
@@ -392,16 +388,12 @@ def on_game_state_update(instance, created, raw, **kwargs):
                     card_state=CARD_STATE_PLAYED)
                 CardGame.objects.filter(room=instance, card_state=CARD_STATE_VOTE).update(
                     card_state=CARD_STATE_VOTE_PREV)
-        #elif instance.game_state == ROOM_GAME_STATE_WAITING_PLAYERS:
         elif instance.game_state == ROOM_GAME_STATE_OTHER_PICK_CARD:
-            print("models ROOM_GAME_STATE_OTHER_PICK_CARD")
             UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True,
                                                                             prev_action_required=True)
         elif instance.game_state == ROOM_GAME_STATE_VOTING:
-            print("models ROOM_GAME_STATE_VOTING")
             UsersInRoom.objects.filter(room=instance, is_host=False).update(action_required=True,
                                                                             prev_action_required=True)
-            print("voting set actions true")
         instance.prev_game_state = instance.game_state
         instance.save()
         async_to_sync(get_channel_layer().group_send)(
